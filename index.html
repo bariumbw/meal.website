@@ -3,154 +3,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>婚嫁學堂 - 登記人資料查詢系統</title>
+    <title>婚嫁學堂 - 登記人管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen py-10 px-4">
+<body class="bg-gray-100 min-h-screen">
 
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 sm:p-8">
-        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-2">🎓 婚嫁學堂登記查詢</h1>
-        <p class="text-center text-gray-500 mb-8 text-sm">請輸入聯絡電話以查找登記人資料及所選課程</p>
+    <nav class="bg-white shadow-sm border-b">
+        <div class="max-w-6xl mx-auto px-4 flex justify-between items-center h-16">
+            <div class="font-bold text-xl text-gray-800">🎓 婚嫁學堂管理系統</div>
+            <div class="flex space-x-2">
+                <button id="navSearchBtn" onclick="switchTab('search')" class="px-4 py-2 rounded-lg text-sm font-medium bg-pink-600 text-white shadow">
+                    🔍 登記人查詢
+                </button>
+                <button id="navAllBtn" onclick="switchTab('all')" class="px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50">
+                    📋 顯示全部資料
+                </button>
+            </div>
+        </div>
+    </nav>
 
-        <div class="flex flex-col sm:flex-row gap-3 mb-8">
-            <input type="text" id="phoneInput" placeholder="請輸入聯絡電話 (例如: 54171851)" 
-                   class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-lg">
-            <button onclick="searchRegistration()" 
-                    class="bg-pink-600 hover:bg-pink-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 text-lg shadow-md">
-                立即查詢
-            </button>
+    <div class="max-w-5xl mx-auto py-8 px-4">
+        
+        <div id="tabSearch" class="bg-white rounded-xl shadow-sm p-6 sm:p-8">
+            <h2 class="text-xl font-bold text-gray-800 mb-2">登記人資料查詢</h2>
+            <p class="text-gray-500 mb-6 text-sm">請輸入登記人的「聯絡電話」或「中文姓名」進行實時檢索</p>
+
+            <div class="flex flex-col sm:flex-row gap-3 mb-8">
+                <input type="text" id="searchInput" placeholder="請輸入聯絡電話 或 姓名 (例如: anna 或 54171851)" 
+                       class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-lg">
+                <button onclick="searchRegistration()" 
+                        class="bg-pink-600 hover:bg-pink-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 text-lg shadow-md">
+                    立即查詢
+                </button>
+            </div>
+
+            <div id="searchLoading" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">🔄 正在檢索工作表資料...</div>
+            <div id="searchResultArea" class="space-y-6"></div>
         </div>
 
-        <div id="loadingStatus" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">
-            🔄 正在實時安全串接兩張工作表，請稍候...
+        <div id="tabAll" class="hidden bg-white rounded-xl shadow-sm p-6 sm:p-8">
+            <div class="flex justify-between items-center mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800">全部登記名冊</h2>
+                    <p class="text-gray-500 text-sm">目前已串接試算表的所有報名紀錄</p>
+                </div>
+                <button onclick="loadAllData()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition">
+                    🔄 重新整理
+                </button>
+            </div>
+
+            <div id="allLoading" class="hidden text-center py-12 text-gray-500 text-lg animate-pulse">🔄 正在下載整合名冊中，請稍候...</div>
+            
+            <div class="overflow-x-auto border border-gray-200 rounded-lg">
+                <table class="min-w-full divide-y divide-gray-200 text-left text-sm">
+                    <thead class="bg-gray-50 font-bold text-gray-700">
+                        <tr>
+                            <th class="px-4 py-3">姓名</th>
+                            <th class="px-4 py-3">電話</th>
+                            <th class="px-4 py-3">登記類型</th>
+                            <th class="px-4 py-3">選修課程數</th>
+                            <th class="px-4 py-3 text-center">報到出席狀態</th>
+                        </tr>
+                    </thead>
+                    <tbody id="allTableBody" class="divide-y divide-gray-200 text-gray-600">
+                        </tbody>
+                </table>
+            </div>
         </div>
 
-        <div id="resultArea" class="space-y-6"></div>
     </div>
 
     <script>
-        // 你的 Google Sheet 識別碼
-        const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
-        const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
+        // 核心資料庫設定
+        const SHEET_ID = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc'; // 你的主要 Google Sheet
+        const GAS_URL = 'https://script.google.com/macros/s/AKfycbwTDtgWM-HmMvncxf8KflwneA2o-rcl2sdjjQ0-Kz6HGc8OibKWkbMp4CR9fK_cHZgy/exec'; // 你的 GAS 部署網址
 
-        // 核心目標課程關鍵字
-        const targetCourses = [
-            "【婚宴合約避雷速成班】",
-            "【中式婚禮禮儀必修課】",
-            "【Big Day 前修身攻略】",
-            "【兄弟姊妹團工作分配 + MC 實戰術】",
-            "【Big Day 全流程速成班】",
-            "【Pre-Wedding婚攝大師班】",
-            "【韓風室內婚攝美學速成班】",
-            "【台灣小清新婚攝夢幻攻略】",
-            "【Big Day 攝影實戰指南】",
-            "【新郎兄弟禮服搭配專修班】",
-            "【新娘上鏡妝容示範班】",
-            "【婚紗身型配對術】",
-            "【海外Pre-Wedding 全方位研修班】"
-        ];
+        // 目標課程關鍵字清單（用於掃描表頭）
+        const targetCourses = ["【婚宴合約避雷速成班】","【中式婚禮禮儀必修課】","【Big Day 前修身攻略】","【兄弟姊妹團工作分配 + MC 實戰術】","【Big Day 全流程速成班】","【Pre-Wedding婚攝大師班】","【韓風室內婚攝美學速成班】","【台灣小清新婚攝夢幻攻略】","【Big Day 攝影實戰指南】","【新郎兄弟禮服搭配專修班】","【新娘上鏡妝容示範班】","【婚紗身型配對術】","【海外Pre-Wedding 全方位研修班】"];
 
-        async function searchRegistration() {
-            const phone = document.getElementById('phoneInput').value.trim();
-            const resultArea = document.getElementById('resultArea');
-            const loadingStatus = document.getElementById('loadingStatus');
+        // 全域快取陣列
+        let globalCachedRecords = [];
 
-            if (!phone) {
-                alert('請輸入聯絡電話！');
-                return;
-            }
+        // 分頁切換
+        function switchTab(tab) {
+            const searchTab = document.getElementById('tabSearch');
+            const allTab = document.getElementById('tabAll');
+            const navSearchBtn = document.getElementById('navSearchBtn');
+            const navAllBtn = document.getElementById('navAllBtn');
 
-            resultArea.innerHTML = '';
-            loadingStatus.classList.remove('hidden');
-
-            try {
-                // 改用純 CSV 流下載，100% 繞過 Google API 的中文字元阻擋機制
-                const [data1, data2] = await Promise.all([
-                    fetchSheetCSV(SHEET_ID_1, phone),
-                    fetchSheetCSV(SHEET_ID_2, phone)
-                ]);
-
-                loadingStatus.classList.add('hidden');
-                const allRecords = [...data1, ...data2];
-
-                if (allRecords.length === 0) {
-                    resultArea.innerHTML = `
-                        <div class="text-center py-8 text-red-500 font-medium text-lg border border-dashed border-red-200 rounded-lg bg-red-50">
-                            找不到與電話「${phone}」相關的登記紀錄。
-                        </div>`;
-                    return;
-                }
-
-                allRecords.forEach((record, index) => {
-                    const card = document.createElement('div');
-                    card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
-
-                    let courseListHTML = '';
-                    if (record.courses && record.courses.length > 0) {
-                        courseListHTML = `<ul class="list-disc pl-5 space-y-1 text-gray-700">`;
-                        record.courses.forEach(c => {
-                            courseListHTML += `<li class="font-medium text-pink-700">${c}</li>`;
-                        });
-                        courseListHTML += `</ul>`;
-                    } else {
-                        courseListHTML = `<p class="text-gray-400 italic">未勾選選修課程 (可能僅登記入場參觀)</p>`;
-                    }
-
-                    card.innerHTML = `
-                        <div class="flex items-center justify-between border-b pb-3 mb-4">
-                            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-pink-100 text-pink-800">
-                                登記紀錄 #${index + 1}
-                            </span>
-                            <span class="text-sm text-gray-400">${record.time || ''}</span>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
-                            <div><strong class="text-gray-800">中文姓名：</strong> ${record.name || '未提供'}</div>
-                            <div><strong class="text-gray-800">聯絡電話：</strong> ${record.phone || phone}</div>
-                            <div><strong class="text-gray-800">Email：</strong> ${record.email || '未提供'}</div>
-                            <div><strong class="text-gray-800">登記類型：</strong> ${record.type || '基本登記'}</div>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                            <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
-                            ${courseListHTML}
-                        </div>
-                    `;
-                    resultArea.appendChild(card);
-                });
-
-            } catch (error) {
-                loadingStatus.classList.add('hidden');
-                console.error("Error details:", error);
-                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">連線失敗！請確保 Google 試算表共用設定為「知道連結的任何人皆可檢視」。</div>`;
+            if (tab === 'search') {
+                searchTab.classList.remove('hidden');
+                allTab.classList.add('hidden');
+                navSearchBtn.className = "px-4 py-2 rounded-lg text-sm font-medium bg-pink-600 text-white shadow";
+                navAllBtn.className = "px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50";
+            } else {
+                searchTab.classList.add('hidden');
+                allTab.classList.remove('hidden');
+                navSearchBtn.className = "px-4 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50";
+                navAllBtn.className = "px-4 py-2 rounded-lg text-sm font-medium bg-pink-600 text-white shadow";
+                if(globalCachedRecords.length === 0) loadAllData();
             }
         }
 
-        // 💡 核心技術改動：請求 export?format=csv 格式，徹底免除特殊字元編碼報錯
-        async function fetchSheetCSV(sheetId, phoneNumber) {
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+        // 🟢 功能 1：支援聯絡電話或姓名模糊查詢
+        async function searchRegistration() {
+            const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+            const resultArea = document.getElementById('searchResultArea');
+            const loading = document.getElementById('searchLoading');
+
+            if (!keyword) { alert('請輸入電話或姓名進行查詢！'); return; }
+            resultArea.innerHTML = '';
+            loading.classList.remove('hidden');
+
+            try {
+                // 實時下載最新數據
+                globalCachedRecords = await fetchSheetCSV(SHEET_ID);
+                loading.classList.add('hidden');
+                
+                // 同步篩選：比對電話包含關鍵字，或者姓名包含關鍵字
+                const matched = globalCachedRecords.filter(r => 
+                    r.phone.includes(keyword) || r.name.toLowerCase().includes(keyword)
+                );
+
+                if (matched.length === 0) {
+                    resultArea.innerHTML = `<div class="text-center py-8 text-red-500 font-medium text-lg border border-dashed border-red-200 rounded-lg bg-red-50">找不到與「${keyword}」相關的登記紀錄。</div>`;
+                    return;
+                }
+
+                renderCards(matched, resultArea);
+            } catch (error) {
+                loading.classList.add('hidden');
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取失敗。請確保 Google 試算表共用設定已開啟「知道連結的任何人皆可檢視」。</div>`;
+            }
+        }
+
+        // 🟢 功能 2：加載並顯示全部資料分頁
+        async function loadAllData() {
+            const tbody = document.getElementById('allTableBody');
+            const loading = document.getElementById('allLoading');
+            tbody.innerHTML = '';
+            loading.classList.remove('hidden');
+
+            try {
+                globalCachedRecords = await fetchSheetCSV(SHEET_ID);
+                loading.classList.add('hidden');
+
+                if(globalCachedRecords.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-gray-400">目前試算表中沒有任何資料</td></tr>`;
+                    return;
+                }
+
+                globalCachedRecords.forEach(record => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 border-b";
+
+                    const isAttended = record.attendance === "已出席";
+                    
+                    tr.innerHTML = `
+                        <td class="px-4 py-3.5 font-medium text-gray-900">${record.name}</td>
+                        <td class="px-4 py-3.5">${record.phone}</td>
+                        <td class="px-4 py-3.5"><span class="text-xs px-2 py-1 rounded bg-gray-100 text-gray-600">${record.type}</span></td>
+                        <td class="px-4 py-3.5 font-bold text-pink-600">${record.courses.length} 門課</td>
+                        <td class="px-4 py-3.5 text-center">
+                            <div class="inline-flex rounded-md shadow-sm" id="btnGroup-all-${record.phone}">
+                                <button onclick="toggleAttendance('${record.phone}', '已出席')" class="px-3 py-1.5 text-xs font-semibold rounded-l-md border ${isAttended ? 'bg-green-600 text-white border-green-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">出席</button>
+                                <button onclick="toggleAttendance('${record.phone}', '未出席')" class="px-3 py-1.5 text-xs font-semibold rounded-r-md border-t border-b border-r ${!isAttended && record.attendance==='未出席' ? 'bg-red-600 text-white border-red-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">未出席</button>
+                            </div>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (error) {
+                loading.classList.add('hidden');
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center py-8 text-red-500 font-semibold">載入大數據失敗。</td></tr>`;
+            }
+        }
+
+        // 渲染查詢卡片（包含出席切換按鈕）
+        function renderCards(records, container) {
+            records.forEach((record, index) => {
+                const card = document.createElement('div');
+                card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition relative";
+
+                let courseListHTML = record.courses.length > 0 ? 
+                    `<ul class="list-disc pl-5 space-y-1 text-gray-700">${record.courses.map(c => `<li class="font-medium text-pink-700">${c}</li>`).join('')}</ul>` : 
+                    `<p class="text-gray-400 italic">未勾選選修課程 (可能僅登記入場參觀)</p>`;
+
+                const isAttended = record.attendance === "已出席";
+
+                card.innerHTML = `
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-3 mb-4 gap-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-pink-100 text-pink-800">登記紀錄 #${index + 1}</span>
+                            <span class="text-sm text-gray-400">${record.time || ''}</span>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm font-medium text-gray-500">現場狀態:</span>
+                            <div class="inline-flex rounded-md shadow-sm" id="btnGroup-card-${record.phone}">
+                                <button onclick="toggleAttendance('${record.phone}', '已出席')" class="px-3 py-1.5 text-xs font-bold rounded-l-md border ${isAttended ? 'bg-green-600 text-white border-green-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">出席</button>
+                                <button onclick="toggleAttendance('${record.phone}', '未出席')" class="px-3 py-1.5 text-xs font-bold rounded-r-md border-t border-b border-r ${!isAttended && record.attendance==='未出席' ? 'bg-red-600 text-white border-red-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">未出席</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
+                        <div><strong class="text-gray-800">中文姓名：</strong> ${record.name}</div>
+                        <div><strong class="text-gray-800">聯絡電話：</strong> ${record.phone}</div>
+                        <div><strong class="text-gray-800">Email：</strong> ${record.email}</div>
+                        <div><strong class="text-gray-800">登記類型：</strong> ${record.type}</div>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                        <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
+                        ${courseListHTML}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        // 🟢 功能 4：點擊出席切換，並即時回寫 Google Sheet
+        async function toggleAttendance(phone, status) {
+            alert(`正在同步將「${phone}」設定為【${status}】至 Google Sheet，請稍候...`);
+
+            try {
+                // 發送請求給應用的 GAS 網址進行寫入
+                await fetch(`${GAS_URL}?phone=${phone}&status=${encodeURIComponent(status)}`, { mode: 'no-cors' });
+                
+                // 本地快取資料樂觀同步更新
+                globalCachedRecords.forEach(r => {
+                    if(r.phone === phone) r.attendance = status;
+                });
+
+                // 即時重新渲染當前檢視畫面
+                if (!document.getElementById('tabSearch').classList.contains('hidden')) {
+                    const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+                    const resultArea = document.getElementById('searchResultArea');
+                    resultArea.innerHTML = '';
+                    const matched = globalCachedRecords.filter(r => r.phone.includes(keyword) || r.name.toLowerCase().includes(keyword));
+                    renderCards(matched, resultArea);
+                } else {
+                    loadAllData();
+                }
+            } catch (e) {
+                console.error(e);
+                alert("即時連線發生錯誤，請檢查 Google 雲端指令碼部署權限是否設為「所有人」。");
+            }
+        }
+
+        // 從試算表拉取純文字流並進行彈性解析
+        async function fetchSheetCSV(sheetId) {
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&t=` + new Date().getTime();
             const response = await fetch(url);
-            if (!response.ok) throw new Error('無法讀取試算表，請檢查權限');
+            if (!response.ok) throw new Error('無法與試算表建立連線');
             
             const csvText = await response.text();
             const lines = parseCSV(csvText);
             if (lines.length === 0) return [];
 
-            const headers = lines[0]; // 第一行是表頭
+            const headers = lines[0];
             
-            // 定位主要欄位索引
+            // 自動適應欄位結構位置 (彈性容錯偵測)
             let phoneIdx = headers.findIndex(h => h.includes("聯絡電話"));
             let timeIdx = headers.findIndex(h => h.includes("Submission time"));
             let nameIdx = headers.findIndex(h => h.includes("中文姓名"));
             let emailIdx = headers.findIndex(h => h.includes("Email"));
             let typeIdx = headers.findIndex(h => h.includes("需要登記參加"));
+            let attendanceIdx = headers.findIndex(h => h.includes("出席狀態")); 
 
-            // 預設防呆
             if (phoneIdx === -1) phoneIdx = 3;
             if (timeIdx === -1) timeIdx = 1;
             if (nameIdx === -1) nameIdx = 2;
             if (emailIdx === -1) emailIdx = 4;
             if (typeIdx === -1) typeIdx = 6;
 
-            // 尋找各課程欄位
             let courseMappings = [];
             headers.forEach((h, idx) => {
                 targetCourses.forEach(courseTitle => {
@@ -160,278 +284,44 @@
                 });
             });
 
-            let matchedRecords = [];
-            
-            // 逐行比對電話號碼
+            let records = [];
             for (let i = 1; i < lines.length; i++) {
                 const cells = lines[i];
                 if (!cells[phoneIdx]) continue;
 
-                const currentPhone = cells[phoneIdx].toString().replace(/\s+/g, ""); // 去除空格
-                const targetPhone = phoneNumber.toString().replace(/\s+/g, "");
+                const currentPhone = cells[phoneIdx].toString().replace(/\s+/g, "");
+                let userCourses = [];
+                courseMappings.forEach(mapping => {
+                    const val = cells[mapping.idx] ? cells[mapping.idx].toUpperCase() : "";
+                    if (val === "TRUE" || val === "1" || val === "Y") userCourses.push(mapping.fullName);
+                });
 
-                if (currentPhone === targetPhone) {
-                    let userCourses = [];
-                    courseMappings.forEach(mapping => {
-                        const val = cells[mapping.idx] ? cells[mapping.idx].toUpperCase() : "";
-                        if (val === "TRUE" || val === "1" || val === "Y") {
-                            userCourses.push(mapping.fullName);
-                        }
-                    });
-
-                    matchedRecords.push({
-                        time: cells[timeIdx] || "",
-                        name: cells[nameIdx] || "未提供",
-                        phone: currentPhone,
-                        email: cells[emailIdx] || "未提供",
-                        type: cells[typeIdx] || "基本登記",
-                        courses: userCourses
-                    });
-                }
+                records.push({
+                    time: cells[timeIdx] || "",
+                    name: cells[nameIdx] || "未提供",
+                    phone: currentPhone,
+                    email: cells[emailIdx] || "未提供",
+                    type: cells[typeIdx] || "基本登記",
+                    attendance: attendanceIdx !== -1 && cells[attendanceIdx] ? cells[attendanceIdx] : "未出席",
+                    courses: userCourses
+                });
             }
-            return matchedRecords;
+            return records;
         }
 
-        // 標準 CSV 解析器（處理欄位內部包含逗號、引號的情況）
+        // 標準 CSV 格式解析函式
         function parseCSV(text) {
-            let p = '', r = [];
-            let q = false;
-            let row = [''];
+            let p = '', r = []; let q = false; let row = [''];
             for (let i = 0; i < text.length; i++) {
                 let c = text[i];
                 if (c === '"') {
-                    if (q && text[i+1] === '"') { row[row.length-1] += '"'; i++; }
-                    else { q = !q; }
+                    if (q && text[i+1] === '"') { row[row.length-1] += '"'; i++; } else { q = !q; }
                 } else if (c === ',') {
-                    if (q) { row[row.length-1] += c; }
-                    else { row.push(''); }
+                    if (q) { row[row.length-1] += c; } else { row.push(''); }
                 } else if (c === '\n' || c === '\r') {
                     if (c === '\r' && text[i+1] === '\n') { i++; }
-                    if (q) { row[row.length-1] += '\n'; }
-                    else { r.push(row); row = ['']; }
-                } else {
-                    row[row.length-1] += c;
-                }
-            }
-            if (row.length > 1 || row[0] !== '') { r.push(row); }
-            return r;
-        }
-    </script>
-</body>
-</html><!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>婚嫁學堂 - 登記人資料查詢系統</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 min-h-screen py-10 px-4">
-
-    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 sm:p-8">
-        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-2">🎓 婚嫁學堂登記查詢</h1>
-        <p class="text-center text-gray-500 mb-8 text-sm">請輸入聯絡電話以查找登記人資料及所選課程</p>
-
-        <div class="flex flex-col sm:flex-row gap-3 mb-8">
-            <input type="text" id="phoneInput" placeholder="請輸入聯絡電話 (例如: 54171851)" 
-                   class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-lg">
-            <button onclick="searchRegistration()" 
-                    class="bg-pink-600 hover:bg-pink-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 text-lg shadow-md">
-                立即查詢
-            </button>
-        </div>
-
-        <div id="loadingStatus" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">
-            🔄 正在實時安全串接兩張工作表，請稍候...
-        </div>
-
-        <div id="resultArea" class="space-y-6"></div>
-    </div>
-
-    <script>
-        // 你的 Google Sheet 識別碼
-        const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
-        const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
-
-        // 核心目標課程關鍵字
-        const targetCourses = [
-            "【婚宴合約避雷速成班】",
-            "【中式婚禮禮儀必修課】",
-            "【Big Day 前修身攻略】",
-            "【兄弟姊妹團工作分配 + MC 實戰術】",
-            "【Big Day 全流程速成班】",
-            "【Pre-Wedding婚攝大師班】",
-            "【韓風室內婚攝美學速成班】",
-            "【台灣小清新婚攝夢幻攻略】",
-            "【Big Day 攝影實戰指南】",
-            "【新郎兄弟禮服搭配專修班】",
-            "【新娘上鏡妝容示範班】",
-            "【婚紗身型配對術】",
-            "【海外Pre-Wedding 全方位研修班】"
-        ];
-
-        async function searchRegistration() {
-            const phone = document.getElementById('phoneInput').value.trim();
-            const resultArea = document.getElementById('resultArea');
-            const loadingStatus = document.getElementById('loadingStatus');
-
-            if (!phone) {
-                alert('請輸入聯絡電話！');
-                return;
-            }
-
-            resultArea.innerHTML = '';
-            loadingStatus.classList.remove('hidden');
-
-            try {
-                // 改用純 CSV 流下載，100% 繞過 Google API 的中文字元阻擋機制
-                const [data1, data2] = await Promise.all([
-                    fetchSheetCSV(SHEET_ID_1, phone),
-                    fetchSheetCSV(SHEET_ID_2, phone)
-                ]);
-
-                loadingStatus.classList.add('hidden');
-                const allRecords = [...data1, ...data2];
-
-                if (allRecords.length === 0) {
-                    resultArea.innerHTML = `
-                        <div class="text-center py-8 text-red-500 font-medium text-lg border border-dashed border-red-200 rounded-lg bg-red-50">
-                            找不到與電話「${phone}」相關的登記紀錄。
-                        </div>`;
-                    return;
-                }
-
-                allRecords.forEach((record, index) => {
-                    const card = document.createElement('div');
-                    card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
-
-                    let courseListHTML = '';
-                    if (record.courses && record.courses.length > 0) {
-                        courseListHTML = `<ul class="list-disc pl-5 space-y-1 text-gray-700">`;
-                        record.courses.forEach(c => {
-                            courseListHTML += `<li class="font-medium text-pink-700">${c}</li>`;
-                        });
-                        courseListHTML += `</ul>`;
-                    } else {
-                        courseListHTML = `<p class="text-gray-400 italic">未勾選選修課程 (可能僅登記入場參觀)</p>`;
-                    }
-
-                    card.innerHTML = `
-                        <div class="flex items-center justify-between border-b pb-3 mb-4">
-                            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-pink-100 text-pink-800">
-                                登記紀錄 #${index + 1}
-                            </span>
-                            <span class="text-sm text-gray-400">${record.time || ''}</span>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
-                            <div><strong class="text-gray-800">中文姓名：</strong> ${record.name || '未提供'}</div>
-                            <div><strong class="text-gray-800">聯絡電話：</strong> ${record.phone || phone}</div>
-                            <div><strong class="text-gray-800">Email：</strong> ${record.email || '未提供'}</div>
-                            <div><strong class="text-gray-800">登記類型：</strong> ${record.type || '基本登記'}</div>
-                        </div>
-                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                            <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
-                            ${courseListHTML}
-                        </div>
-                    `;
-                    resultArea.appendChild(card);
-                });
-
-            } catch (error) {
-                loadingStatus.classList.add('hidden');
-                console.error("Error details:", error);
-                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">連線失敗！請確保 Google 試算表共用設定為「知道連結的任何人皆可檢視」。</div>`;
-            }
-        }
-
-        // 💡 核心技術改動：請求 export?format=csv 格式，徹底免除特殊字元編碼報錯
-        async function fetchSheetCSV(sheetId, phoneNumber) {
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('無法讀取試算表，請檢查權限');
-            
-            const csvText = await response.text();
-            const lines = parseCSV(csvText);
-            if (lines.length === 0) return [];
-
-            const headers = lines[0]; // 第一行是表頭
-            
-            // 定位主要欄位索引
-            let phoneIdx = headers.findIndex(h => h.includes("聯絡電話"));
-            let timeIdx = headers.findIndex(h => h.includes("Submission time"));
-            let nameIdx = headers.findIndex(h => h.includes("中文姓名"));
-            let emailIdx = headers.findIndex(h => h.includes("Email"));
-            let typeIdx = headers.findIndex(h => h.includes("需要登記參加"));
-
-            // 預設防呆
-            if (phoneIdx === -1) phoneIdx = 3;
-            if (timeIdx === -1) timeIdx = 1;
-            if (nameIdx === -1) nameIdx = 2;
-            if (emailIdx === -1) emailIdx = 4;
-            if (typeIdx === -1) typeIdx = 6;
-
-            // 尋找各課程欄位
-            let courseMappings = [];
-            headers.forEach((h, idx) => {
-                targetCourses.forEach(courseTitle => {
-                    if (h.includes(courseTitle)) {
-                        courseMappings.push({ idx: idx, fullName: h });
-                    }
-                });
-            });
-
-            let matchedRecords = [];
-            
-            // 逐行比對電話號碼
-            for (let i = 1; i < lines.length; i++) {
-                const cells = lines[i];
-                if (!cells[phoneIdx]) continue;
-
-                const currentPhone = cells[phoneIdx].toString().replace(/\s+/g, ""); // 去除空格
-                const targetPhone = phoneNumber.toString().replace(/\s+/g, "");
-
-                if (currentPhone === targetPhone) {
-                    let userCourses = [];
-                    courseMappings.forEach(mapping => {
-                        const val = cells[mapping.idx] ? cells[mapping.idx].toUpperCase() : "";
-                        if (val === "TRUE" || val === "1" || val === "Y") {
-                            userCourses.push(mapping.fullName);
-                        }
-                    });
-
-                    matchedRecords.push({
-                        time: cells[timeIdx] || "",
-                        name: cells[nameIdx] || "未提供",
-                        phone: currentPhone,
-                        email: cells[emailIdx] || "未提供",
-                        type: cells[typeIdx] || "基本登記",
-                        courses: userCourses
-                    });
-                }
-            }
-            return matchedRecords;
-        }
-
-        // 標準 CSV 解析器（處理欄位內部包含逗號、引號的情況）
-        function parseCSV(text) {
-            let p = '', r = [];
-            let q = false;
-            let row = [''];
-            for (let i = 0; i < text.length; i++) {
-                let c = text[i];
-                if (c === '"') {
-                    if (q && text[i+1] === '"') { row[row.length-1] += '"'; i++; }
-                    else { q = !q; }
-                } else if (c === ',') {
-                    if (q) { row[row.length-1] += c; }
-                    else { row.push(''); }
-                } else if (c === '\n' || c === '\r') {
-                    if (c === '\r' && text[i+1] === '\n') { i++; }
-                    if (q) { row[row.length-1] += '\n'; }
-                    else { r.push(row); row = ['']; }
-                } else {
-                    row[row.length-1] += c;
-                }
+                    if (q) { row[row.length-1] += '\n'; } else { r.push(row); row = ['']; }
+                } else { row[row.length-1] += c; }
             }
             if (row.length > 1 || row[0] !== '') { r.push(row); }
             return r;
