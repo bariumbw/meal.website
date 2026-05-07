@@ -138,57 +138,78 @@
     </div>
 
     <script>
+        // 目標 Google Sheet ID
         const SPREADSHEET_ID = '1bsf6I3TJJRMZi3w4nS7yoz6Yn7Tt43hGHpZLg5stk-w';
         let products = {};
         let cart = {}; 
         let currentModalProductId = null;
         let currentModalQty = 1;
 
-        // 優化版：自動處理 Google Sheets 欄位大小寫與空格
-        async function fetchSheetData(sheetName) {
-            const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+        // 採用最穩定的官方 CSV 匯出格式解析，保證不被 Google 安全機制阻擋
+        async function fetchSheetDataCSV(sheetName) {
+            const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
             const response = await fetch(url);
             const text = await response.text();
-            const json = JSON.parse(text.substr(47).slice(0, -2));
             
-            const rows = json.table.rows;
-            // 將所有欄位名稱轉為純小寫、去空格
-            const cols = json.table.cols.map(c => (c.label || c.id || '').toLowerCase().trim());
+            // 解析 CSV 轉換成 JSON
+            const lines = text.split('\n');
+            if (lines.length < 1) return [];
             
-            return rows.map(row => {
-                let obj = {};
-                row.c.forEach((cell, i) => {
-                    if(cols[i]) {
-                        obj[cols[i]] = cell ? cell.v : '';
+            // 處理標頭
+            const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
+            
+            const result = [];
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                // 處理可能包含逗號引號的 CSV 欄位
+                let row = [];
+                let inQuotes = false;
+                let currentField = '';
+                
+                for (let char of lines[i]) {
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        row.push(currentField.trim());
+                        currentField = '';
+                    } else {
+                        currentField += char;
                     }
+                }
+                row.push(currentField.trim());
+                
+                let obj = {};
+                headers.forEach((header, index) => {
+                    let val = row[index] ? row[index].replace(/^"|"$/g, '') : '';
+                    if (header) obj[header] = val;
                 });
-                return obj;
-            });
+                result.push(obj);
+            }
+            return result;
         }
 
         async function initSystem() {
             try {
-                // 1. 讀取 Banner 資訊
+                // 1. 讀取 Banner
                 try {
-                    const bannerData = await fetchSheetData('Banner');
-                    if(bannerData && bannerData.length > 0) {
-                        // 自動尋找相近的欄位名稱
+                    const bannerData = await fetchSheetDataCSV('Banner');
+                    if (bannerData && bannerData.length > 0) {
                         const row = bannerData[0];
-                        const title = row.title || row.storename || row.店家名稱 || '';
-                        const subtitle = row.subtitle || row.announcement || row.公告 || '';
-                        const imageUrl = row.imageurl || row.image || row.banner圖片 || '';
+                        const title = row.title || row.storename || row.店家名稱;
+                        const subtitle = row.subtitle || row.announcement || row.公告;
+                        const imageUrl = row.imageurl || row.image || row.banner圖片;
 
                         if(title) document.getElementById('store-name').innerText = title;
                         if(subtitle) document.getElementById('store-announcement').innerText = `💰 ${subtitle}`;
                         if(imageUrl) document.getElementById('store-banner-img').src = imageUrl;
                     }
-                } catch(e) { console.log("Banner 讀取使用預設值"); }
+                } catch(e) { console.log("Banner 載入失敗，採用備用預設值"); }
 
-                // 2. 讀取 Products 商品列表
-                const productsData = await fetchSheetData('Products');
+                // 2. 讀取 Products
+                const productsData = await fetchSheetDataCSV('Products');
                 
                 productsData.forEach(p => {
-                    // 相容各種可能的欄位名稱
                     const id = p.id || p.商品id || p.編號;
                     const category = p.category || p.分類 || 'cat-1';
                     const name = p.name || p.title || p.商品名稱;
@@ -197,12 +218,11 @@
                     const image = p.image || p.imageurl || p.圖片網址 || '';
                     const status = p.status || p.狀態 || '上架';
 
-                    // 只要狀態不是「下架」，且有名字跟 ID 就上架
-                    if(id && name && status.toString().trim() !== '下架') {
+                    if (id && name && status.toString().trim() !== '下架') {
                         let finalCat = 'cat-1';
                         const catStr = category.toString().toLowerCase().trim();
-                        if(catStr.includes('2') || catStr.includes('小吃')) finalCat = 'cat-2';
-                        if(catStr.includes('3') || catStr.includes('飲品')) finalCat = 'cat-3';
+                        if (catStr.includes('2') || catStr.includes('小吃') || catStr.includes('cat-2')) finalCat = 'cat-2';
+                        if (catStr.includes('3') || catStr.includes('飲品') || catStr.includes('cat-3')) finalCat = 'cat-3';
 
                         products[id] = {
                             id: id,
@@ -219,7 +239,7 @@
                 document.getElementById('loading-screen').classList.add('hidden');
                 switchPage('menu');
             } catch (error) {
-                alert('讀取後台失敗！請確認您的 Google 試算表右上角有按「共用」，並設定為「知道連結的任何人」都可以檢視唷！');
+                alert('串接失敗！請確認 Google 試算表右上角是否開啟「共用」，並設定為「知道連結的任何人」皆可檢視！');
                 console.error(error);
             }
         }
@@ -330,6 +350,7 @@
         }
         function checkout() { alert(`訂單送出成功！`); }
 
+        // 執行
         initSystem();
     </script>
 </body>
