@@ -1,357 +1,174 @@
 <!DOCTYPE html>
-<html lang="zh-TW">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>線上點餐系統</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <style>
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    </style>
+    <title>婚嫁學堂 - 登記人資料查詢系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-50 min-h-screen text-gray-800 antialiased">
+<body class="bg-gray-50 min-h-screen py-10 px-4">
 
-    <div class="min-h-screen flex flex-col max-w-md mx-auto bg-white shadow-lg relative pb-24">
-        
-        <header class="bg-white px-4 py-3 border-b border-gray-100 flex items-center justify-between sticky top-0 z-30">
-            <div class="flex items-center space-x-2">
-                <span class="bg-rose-50 text-rose-600 text-xs font-bold px-2.5 py-1 rounded">今日已打烊</span>
-                <span class="bg-gray-100 text-gray-700 text-xs font-medium px-2.5 py-1 rounded">外帶自取</span>
-            </div>
-            <div class="flex items-center space-x-3 text-sm text-gray-500">
-                <button onclick="switchPage('home')" class="hover:text-gray-900 font-medium">店家資訊</button>
-                <span class="border-l h-3 border-gray-300"></span>
-                <button class="border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold text-gray-700">EN</button>
-            </div>
-        </header>
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 sm:p-8">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-2">🎓 婚嫁學堂登記查詢</h1>
+        <p class="text-center text-gray-500 mb-8 text-sm">請輸入聯絡電話以查找登記人資料及所選課程</p>
 
-        <div id="loading-screen" class="absolute inset-0 bg-white z-50 flex flex-col items-center justify-center">
-            <div class="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
-            <p class="text-xs text-gray-400 mt-3 font-medium tracking-wider">正在讀取最新菜單...</p>
-        </div>
-
-        <main id="page-home" class="page-content hidden flex-1 p-4 overflow-y-auto">
-            <div class="rounded-2xl overflow-hidden shadow-sm mb-4 relative bg-gray-100 h-40">
-                <img id="store-banner-img" src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600" class="w-full h-40 object-cover" alt="Store Banner">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                    <h1 id="store-name" class="text-xl font-bold text-white">我的客製化餐館</h1>
-                </div>
-            </div>
-            
-            <div class="space-y-4 text-sm">
-                <div id="store-announcement" class="bg-amber-50 text-amber-800 p-3 rounded-xl border border-amber-100">
-                    💰 本店提供消費滿 $500 免運費服務！
-                </div>
-                <div class="border-b pb-3">
-                    <h3 class="font-bold text-base mb-1">營業時間</h3>
-                    <p class="text-gray-600">週一至週日 11:00 - 20:00</p>
-                </div>
-                <div class="border-b pb-3">
-                    <h3 class="font-bold text-base mb-1">店家地址</h3>
-                    <p class="text-gray-600">台北市信義區幸福路 88 號</p>
-                </div>
-                <button onclick="switchPage('menu')" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-sm mt-4">
-                    開始點餐 ➔
-                </button>
-            </div>
-        </main>
-
-        <main id="page-menu" class="page-content flex-1 flex flex-col overflow-hidden">
-            <div class="bg-white border-b border-gray-100 sticky top-[49px] z-20 flex overflow-x-auto no-scrollbar px-4 py-2.5 space-x-2">
-                <button id="cat-btn-cat-1" onclick="scrollToCategory('cat-1')" class="cat-tab-btn whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium bg-emerald-600 text-white">熱門主食</button>
-                <button id="cat-btn-cat-2" onclick="scrollToCategory('cat-2')" class="cat-tab-btn whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600">精選小吃</button>
-                <button id="cat-btn-cat-3" onclick="scrollToCategory('cat-3')" class="cat-tab-btn whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600">特調飲品</button>
-            </div>
-
-            <div class="flex-1 overflow-y-auto p-4 space-y-6" id="menu-scroll-container">
-                <div id="cat-1" class="category-section">
-                    <h3 class="font-bold text-gray-500 text-xs tracking-wider mb-3">熱門主食</h3>
-                    <div id="products-cat-1" class="space-y-3"></div>
-                </div>
-                <div id="cat-2" class="category-section">
-                    <h3 class="font-bold text-gray-500 text-xs tracking-wider mb-3">精選小吃</h3>
-                    <div id="products-cat-2" class="space-y-3"></div>
-                </div>
-                <div id="cat-3" class="category-section">
-                    <h3 class="font-bold text-gray-500 text-xs tracking-wider mb-3">特調飲品</h3>
-                    <div id="products-cat-3" class="space-y-3"></div>
-                </div>
-            </div>
-        </main>
-
-        <main id="page-orders" class="page-content hidden flex-1 p-4 overflow-y-auto">
-            <h2 class="text-xl font-bold text-gray-900 mb-4">歷史訂單</h2>
-            <div class="flex flex-col items-center justify-center pt-20 text-gray-400"><span class="text-5xl mb-3">🛍️</span><p class="text-sm">尚未有任何點餐紀錄</p></div>
-        </main>
-        <main id="page-profile" class="page-content hidden flex-1 p-4 overflow-y-auto">
-            <h2 class="text-xl font-bold text-gray-900 mb-4">會員中心</h2>
-            <div class="bg-gray-50 p-4 rounded-xl flex items-center space-x-3 border border-gray-100 mb-6">
-                <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500">G</div>
-                <div><h4 class="font-bold text-gray-800">訪客會員</h4><p class="text-xs text-gray-400">登入後享受完整客製服務</p></div>
-            </div>
-        </main>
-
-        <div id="cart-bar" class="hidden fixed bottom-18 left-0 right-0 max-w-sm mx-auto bg-emerald-600 text-white mx-4 rounded-xl p-3 flex justify-between items-center shadow-lg z-40">
-            <div class="flex items-center space-x-2">
-                <span id="cart-count" class="bg-emerald-800 text-white text-xs font-bold px-2 py-0.5 rounded-full">0</span>
-                <span class="font-medium text-sm">已加入購物車</span>
-            </div>
-            <button onclick="checkout()" class="flex items-center space-x-1 font-bold text-sm bg-emerald-700 hover:bg-emerald-800 px-3 py-1.5 rounded-lg transition">
-                <span id="cart-total">$0</span><span>去結帳 ❯</span>
+        <div class="flex flex-col sm:flex-row gap-3 mb-8">
+            <input type="text" id="phoneInput" placeholder="請輸入聯絡電話 (例如: 54171851)" 
+                   class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-lg">
+            <button onclick="searchRegistration()" 
+                    class="bg-pink-600 hover:bg-pink-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 text-lg shadow-md">
+                立即查詢
             </button>
         </div>
 
-        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-100 flex justify-around py-2 z-30">
-            <button id="nav-home" onclick="switchPage('home')" class="nav-btn flex flex-col items-center text-gray-400"><span class="text-xl">🏠</span><span class="text-xs mt-0.5">Home</span></button>
-            <button id="nav-menu" onclick="switchPage('menu')" class="nav-btn flex flex-col items-center text-emerald-600 font-medium"><span class="text-xl">📋</span><span class="text-xs mt-0.5">Menu</span></button>
-            <button id="nav-orders" onclick="switchPage('orders')" class="nav-btn flex flex-col items-center text-gray-400"><span class="text-xl">🛍️</span><span class="text-xs mt-0.5">Orders</span></button>
-            <button id="nav-profile" onclick="switchPage('profile')" class="nav-btn flex flex-col items-center text-gray-400"><span class="text-xl">👤</span><span class="text-xs mt-0.5">Profile</span></button>
-        </nav>
-    </div>
-
-    <div id="product-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0">
-        <div class="bg-white w-full max-w-md rounded-t-2xl max-h-[85vh] overflow-y-auto flex flex-col">
-            <div class="p-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white">
-                <h3 id="modal-product-name" class="font-bold text-lg text-gray-900">商品名稱</h3>
-                <button onclick="closeModal()" class="text-gray-400 text-2xl">✕</button>
-            </div>
-            <div class="p-4 space-y-6 flex-1 overflow-y-auto">
-                <img id="modal-product-image" src="" class="w-full h-48 object-cover rounded-xl mb-2">
-                <p id="modal-product-desc" class="text-sm text-gray-500"></p>
-                <div>
-                    <label class="block text-sm font-bold text-gray-700 mb-2">客製化備註</label>
-                    <input type="text" placeholder="例如：不加醬、去冰、加蛋..." class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-emerald-600">
-                </div>
-            </div>
-            <div class="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
-                <div class="flex items-center space-x-3 bg-white border border-gray-200 rounded-full p-1.5">
-                    <button onclick="changeModalQty(-1)" class="w-8 h-8 rounded-full bg-gray-100 font-bold">-</button>
-                    <span id="modal-qty" class="font-bold w-4 text-center">1</span>
-                    <button onclick="changeModalQty(1)" class="w-8 h-8 rounded-full bg-gray-950 text-white font-bold">+</button>
-                </div>
-                <button onclick="confirmAddToCart()" class="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold text-sm">
-                    加入購物車 <span id="modal-total-price">$0</span>
-                </button>
-            </div>
+        <div id="loadingStatus" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">
+            🔍 正在實時檢索兩張工作表，請稍候...
         </div>
+
+        <div id="resultArea" class="space-y-6"></div>
     </div>
 
     <script>
-        // 目標 Google Sheet ID
-        const SPREADSHEET_ID = '1bsf6I3TJJRMZi3w4nS7yoz6Yn7Tt43hGHpZLg5stk-w';
-        let products = {};
-        let cart = {}; 
-        let currentModalProductId = null;
-        let currentModalQty = 1;
+        // 🛠️ 請在此處填入你那兩個 Google Sheet 的完整 ID
+        const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
+        const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
 
-        // 採用最穩定的官方 CSV 匯出格式解析，保證不被 Google 安全機制阻擋
-        async function fetchSheetDataCSV(sheetName) {
-            const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-            const response = await fetch(url);
+        // 這是 Google 表格內各課程對應的欄位中文名稱 (依據你的欄位結構定義)
+        const courseColumns = [
+            "【婚宴合約避雷速成班】 （講者：前資深宴會經理 ｜ P 叔叔）",
+            "【中式婚禮禮儀必修課】（講者：資深專業大妗｜羅勤芳）",
+            "【Big Day 前修身攻略】（講者：星級健身導師 ｜李綺雯）",
+            "【兄弟姊妹團工作分配 + MC 實戰術】（講者：婚禮細節之鬼 ｜MC Alan Li ）",
+            "【Big Day 全流程速成班】（講者：專業Wedding planner｜Michelle Ng）",
+            "【Pre-Wedding婚攝大師班】（講者：Jason Pang Gallery｜Jason Pang ）",
+            "【韓風室內婚攝美學速成班】",
+            "【台灣小清新婚攝夢幻攻略】",
+            "【Big Day 攝影實戰指南】",
+            "【新郎兄弟禮服搭配專修班】",
+            "【新娘上鏡妝容示範班】現場Model示範",
+            "【婚紗身型配對術】",
+            "【海外Pre-Wedding 全方位研修班】"
+        ];
+
+        async function searchRegistration() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            const resultArea = document.getElementById('resultArea');
+            const loadingStatus = document.getElementById('loadingStatus');
+
+            if (!phone) {
+                alert('請輸入聯絡電話！');
+                return;
+            }
+
+            // 重設 UI
+            resultArea.innerHTML = '';
+            loadingStatus.classList.remove('hidden');
+
+            try {
+                // 同時向兩張試算表發出異步查詢請求 (實時獲取)
+                const [data1, data2] = await Promise.all([
+                    fetchSheetData(SHEET_ID_1, phone),
+                    fetchSheetData(SHEET_ID_2, phone)
+                ]);
+
+                loadingStatus.classList.add('hidden');
+
+                // 合併兩張表的結果
+                const allRecords = [...data1, ...data2];
+
+                if (allRecords.length === 0) {
+                    resultArea.innerHTML = `
+                        <div class="text-center py-8 text-red-500 font-medium text-lg border border-dashed border-red-200 rounded-lg bg-red-50">
+                            找不到與電話「${phone}」相關的登記紀錄。
+                        </div>`;
+                    return;
+                }
+
+                // 渲染找到的每條登記人資料
+                allRecords.forEach((record, index) => {
+                    const card = document.createElement('div');
+                    card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
+
+                    // 解析登記人選擇了哪些課程
+                    let selectedCourses = [];
+                    courseColumns.forEach(course => {
+                        if (record[course] && record[course].toString().toUpperCase() === 'TRUE') {
+                            selectedCourses.push(course);
+                        }
+                    });
+
+                    // 建立課程列表 HTML
+                    let courseListHTML = '';
+                    if (selectedCourses.length > 0) {
+                        courseListHTML = `<ul class="list-disc pl-5 space-y-1 text-gray-700">`;
+                        selectedCourses.forEach(c => {
+                            courseListHTML += `<li class="font-medium text-pink-700">${c}</li>`;
+                        });
+                        courseListHTML += `</ul>`;
+                    } else {
+                        courseListHTML = `<p class="text-gray-400 italic">未勾選選修課程 (可能僅登記入場參觀)</p>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between border-b pb-3 mb-4">
+                            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-pink-100 text-pink-800">
+                                登記紀錄 #${index + 1}
+                            </span>
+                            <span class="text-sm text-gray-400">${record["Submission time"] || ''}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
+                            <div><strong class="text-gray-800">中文姓名：</strong> ${record["中文姓名 :"] || record["中文姓名"] || '未提供'}</div>
+                            <div><strong class="text-gray-800">聯絡電話：</strong> ${record["聯絡電話(可接受WhatsApps 通知) :"] || phone}</div>
+                            <div><strong class="text-gray-800">Email：</strong> ${record["Email :"] || record["Email"] || '未提供'}</div>
+                            <div><strong class="text-gray-800">登記類型：</strong> ${record["需要登記參加"] || '基本登記'}</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                            <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
+                            ${courseListHTML}
+                        </div>
+                    `;
+                    resultArea.appendChild(card);
+                });
+
+            } catch (error) {
+                loadingStatus.classList.add('hidden');
+                console.error(error);
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取 Google Sheets 發生錯誤，請確認 Sheet 權限已公開。</div>`;
+            }
+        }
+
+        // 利用 Google Visualization API 實時對特定的 Sheet 進行 SQL-like 查詢
+        async function fetchSheetData(sheetId, phoneNumber) {
+            // 注意：你表中的電話欄位在 D 欄 (即第 4 欄)
+            // 這裡使用 SQL 語法：Select * where D = '電話號碼'
+            const tqUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tq=` + encodeURIComponent(`SELECT * WHERE D = '${phoneNumber}'`);
+            
+            const response = await fetch(tqUrl);
             const text = await response.text();
             
-            // 解析 CSV 轉換成 JSON
-            const lines = text.split('\n');
-            if (lines.length < 1) return [];
-            
-            // 處理標頭
-            const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').toLowerCase().trim());
-            
-            const result = [];
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                
-                // 處理可能包含逗號引號的 CSV 欄位
-                let row = [];
-                let inQuotes = false;
-                let currentField = '';
-                
-                for (let char of lines[i]) {
-                    if (char === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
-                        row.push(currentField.trim());
-                        currentField = '';
-                    } else {
-                        currentField += char;
-                    }
-                }
-                row.push(currentField.trim());
-                
-                let obj = {};
-                headers.forEach((header, index) => {
-                    let val = row[index] ? row[index].replace(/^"|"$/g, '') : '';
-                    if (header) obj[header] = val;
-                });
-                result.push(obj);
+            // Google 返回的資料帶有特定的 jsonp 格式包裹，需要進行切片清洗出標準 JSON
+            const jsonString = text.substring(text.indexOf("google.visualization.Query.setResponse(") + 38, text.length - 2);
+            const json = JSON.parse(jsonString);
+
+            if (json.status === 'error') {
+                console.error("Google Query Error:", json.errors);
+                return [];
             }
-            return result;
-        }
 
-        async function initSystem() {
-            try {
-                // 1. 讀取 Banner
-                try {
-                    const bannerData = await fetchSheetDataCSV('Banner');
-                    if (bannerData && bannerData.length > 0) {
-                        const row = bannerData[0];
-                        const title = row.title || row.storename || row.店家名稱;
-                        const subtitle = row.subtitle || row.announcement || row.公告;
-                        const imageUrl = row.imageurl || row.image || row.banner圖片;
+            const rows = json.table.rows;
+            const cols = json.table.cols;
 
-                        if(title) document.getElementById('store-name').innerText = title;
-                        if(subtitle) document.getElementById('store-announcement').innerText = `💰 ${subtitle}`;
-                        if(imageUrl) document.getElementById('store-banner-img').src = imageUrl;
-                    }
-                } catch(e) { console.log("Banner 載入失敗，採用備用預設值"); }
-
-                // 2. 讀取 Products
-                const productsData = await fetchSheetDataCSV('Products');
-                
-                productsData.forEach(p => {
-                    const id = p.id || p.商品id || p.編號;
-                    const category = p.category || p.分類 || 'cat-1';
-                    const name = p.name || p.title || p.商品名稱;
-                    const price = p.price || p.價格 || p.金額;
-                    const description = p.description || p.desc || p.商品簡介 || '';
-                    const image = p.image || p.imageurl || p.圖片網址 || '';
-                    const status = p.status || p.狀態 || '上架';
-
-                    if (id && name && status.toString().trim() !== '下架') {
-                        let finalCat = 'cat-1';
-                        const catStr = category.toString().toLowerCase().trim();
-                        if (catStr.includes('2') || catStr.includes('小吃') || catStr.includes('cat-2')) finalCat = 'cat-2';
-                        if (catStr.includes('3') || catStr.includes('飲品') || catStr.includes('cat-3')) finalCat = 'cat-3';
-
-                        products[id] = {
-                            id: id,
-                            category: finalCat,
-                            name: name,
-                            price: Number(price) || 0,
-                            description: description,
-                            image: image
-                        };
+            // 將表頭欄位與資料列組裝對應成 JavaScript Object
+            return rows.map(row => {
+                let item = {};
+                row.c.forEach((cell, i) => {
+                    if (cols[i] && cols[i].label) {
+                        item[cols[i].label] = cell ? cell.v : null;
                     }
                 });
-
-                renderMenu();
-                document.getElementById('loading-screen').classList.add('hidden');
-                switchPage('menu');
-            } catch (error) {
-                alert('串接失敗！請確認 Google 試算表右上角是否開啟「共用」，並設定為「知道連結的任何人」皆可檢視！');
-                console.error(error);
-            }
-        }
-
-        function renderMenu() {
-            document.getElementById('products-cat-1').innerHTML = '';
-            document.getElementById('products-cat-2').innerHTML = '';
-            document.getElementById('products-cat-3').innerHTML = '';
-
-            let hasProducts = false;
-
-            for(let id in products) {
-                const p = products[id];
-                const container = document.getElementById(`products-${p.category}`);
-                if(!container) continue;
-
-                hasProducts = true;
-                container.innerHTML += `
-                    <div onclick="openModal('${p.id}')" class="bg-white rounded-xl p-3 flex shadow-xs border border-gray-100 cursor-pointer hover:border-gray-300 transition">
-                        <img src="${p.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'}" class="w-20 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100" onError="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'" />
-                        <div class="ml-3 flex flex-col justify-between flex-1">
-                            <div>
-                                <h4 class="font-bold text-gray-900 text-base">${p.name}</h4>
-                                <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">${p.description}</p>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="text-emerald-600 font-bold">$${p.price}</span>
-                                <div id="action-${p.id}" onclick="event.stopPropagation();">
-                                    <button onclick="openModal('${p.id}')" class="bg-gray-950 text-white text-xs px-3 py-1.5 rounded-full font-bold">＋ 加入</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
-
-            if(!hasProducts) {
-                document.getElementById('products-cat-1').innerHTML = '<p class="text-center text-xs text-gray-400 py-6">後台暫無上架商品，或分類代號不正確。</p>';
-            }
-        }
-
-        function switchPage(pageName) {
-            document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`page-${pageName}`).classList.remove('hidden');
-            document.querySelectorAll('.nav-btn').forEach(el => {
-                el.classList.remove('text-emerald-600', 'font-medium'); el.classList.add('text-gray-400');
+                return item;
             });
-            const activeNav = document.getElementById(`nav-${pageName}`);
-            if(activeNav) { activeNav.classList.remove('text-gray-400'); activeNav.classList.add('text-emerald-600', 'font-medium'); }
         }
-
-        function scrollToCategory(catId) {
-            const element = document.getElementById(catId);
-            const container = document.getElementById('menu-scroll-container');
-            if (element && container) {
-                container.scrollTo({ top: element.offsetTop - container.offsetTop, behavior: 'smooth' });
-            }
-            document.querySelectorAll('.cat-tab-btn').forEach(btn => {
-                btn.classList.remove('bg-emerald-600', 'text-white'); btn.classList.add('bg-gray-100', 'text-gray-600');
-            });
-            document.getElementById(`cat-btn-${catId}`).classList.remove('bg-gray-100', 'text-gray-600');
-            document.getElementById(`cat-btn-${catId}`).classList.add('bg-emerald-600', 'text-white');
-        }
-
-        function openModal(productId) {
-            const product = products[productId]; currentModalProductId = productId; currentModalQty = cart[productId] || 1;
-            document.getElementById('modal-product-name').innerText = product.name;
-            document.getElementById('modal-product-desc').innerText = product.description;
-            document.getElementById('modal-product-image').src = product.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300';
-            updateModalUI(); document.getElementById('product-modal').classList.remove('hidden');
-        }
-        function closeModal() { document.getElementById('product-modal').classList.add('hidden'); }
-        function changeModalQty(change) { currentModalQty += change; if (currentModalQty < 1) currentModalQty = 1; updateModalUI(); }
-        function updateModalUI() { document.getElementById('modal-qty').innerText = currentModalQty; document.getElementById('modal-total-price').innerText = `$${products[currentModalProductId].price * currentModalQty}`; }
-
-        function confirmAddToCart() {
-            cart[currentModalProductId] = currentModalQty;
-            document.getElementById(`action-${currentModalProductId}`).innerHTML = `
-                <div class="flex items-center space-x-2 bg-gray-100 rounded-full p-1 border border-gray-200">
-                    <button onclick="updateCartDirect('${currentModalProductId}', -1)" class="w-6 h-6 rounded-full bg-white flex items-center justify-center text-gray-600 font-bold">-</button>
-                    <span class="text-xs font-bold text-gray-800 w-4 text-center">${currentModalQty}</span>
-                    <button onclick="updateCartDirect('${currentModalProductId}', 1)" class="w-6 h-6 rounded-full bg-gray-950 text-white flex items-center justify-center font-bold">+</button>
-                </div>`;
-            updateCartBar(); closeModal();
-        }
-
-        function updateCartDirect(productId, change) {
-            let newQty = (cart[productId] || 0) + change;
-            if (newQty <= 0) {
-                delete cart[productId];
-                document.getElementById(`action-${productId}`).innerHTML = `<button onclick="openModal('${productId}')" class="bg-gray-950 text-white text-xs px-3 py-1.5 rounded-full font-bold">＋ 加入</button>`;
-            } else {
-                cart[productId] = newQty;
-                document.getElementById(`action-${productId}`).querySelector('span').innerText = newQty;
-            }
-            updateCartBar();
-        }
-
-        function updateCartBar() {
-            const cartBar = document.getElementById('cart-bar');
-            let totalItems = 0, totalPrice = 0;
-            for (const id in cart) { totalItems += cart[id]; totalPrice += products[id].price * cart[id]; }
-            if (totalItems > 0) {
-                cartBar.classList.remove('hidden');
-                document.getElementById('cart-count').innerText = totalItems;
-                document.getElementById('cart-total').innerText = `$${totalPrice}`;
-            } else { cartBar.classList.add('hidden'); }
-        }
-        function checkout() { alert(`訂單送出成功！`); }
-
-        // 執行
-        initSystem();
     </script>
 </body>
 </html>
