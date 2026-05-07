@@ -33,31 +33,21 @@
         const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
         const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
 
-        // 💡 核心修正：改用 Column ID (A, B, C...) 直接對應你試算表上的欄位，避開中文特殊符號問題
-        const columnsMapping = {
-            id: 'A',          // Submission ID
-            time: 'B',        // Submission time
-            name: 'C',        // 中文姓名
-            phone: 'D',       // 聯絡電話
-            email: 'E',       // Email
-            type: 'G'         // 需要登記參加 (例如: 參加【備婚特訓班】)
-        };
-
-        // 課程欄位對應（H欄 到 T欄）
+        // 💡 終極方案：依據欄位順序 (0=A, 1=B, 2=C...) 進行絕對定位，完全避開中文字元編碼問題
         const courseColumns = [
-            { col: 'H', name: "【婚宴合約避雷速成班】（講者：前資深宴會經理 ｜ P 叔叔）" },
-            { col: 'I', name: "【中式婚禮禮儀必修課】（講者：資深專業大妗｜羅勤芳）" },
-            { col: 'J', name: "【Big Day 前修身攻略】（講者：星級健身導師 ｜李綺雯）" },
-            { col: 'K', name: "【兄弟姊妹團工作分配 + MC 實戰術】（講者：婚禮細節之鬼 ｜MC Alan Li ）" },
-            { col: 'L', name: "【Big Day 全流程速成班】（講者：專業Wedding planner｜Michelle Ng）" },
-            { col: 'M', name: "【Pre-Wedding婚攝大師班】（講者：Jason Pang Gallery｜Jason Pang ）" },
-            { col: 'N', name: "【韓風室內婚攝美學速成班】" },
-            { col: 'O', name: "【台灣小清新婚攝夢幻攻略】" },
-            { col: 'P', name: "【Big Day 攝影實戰指南】" },
-            { col: 'Q', name: "【新郎兄弟禮服搭配專修班】" },
-            { col: 'R', name: "【新娘上鏡妝容示範班】現場Model示範" },
-            { col: 'S', name: "【婚紗身型配對術】" },
-            { col: 'T', name: "【海外Pre-Wedding 全方位研修班】" }
+            { index: 7, name: "【婚宴合約避雷速成班】（講者：前資深宴會經理 ｜ P 叔叔）" },
+            { index: 8, name: "【中式婚禮禮儀必修課】（講者：資深專業大妗｜羅勤芳）" },
+            { index: 9, name: "【Big Day 前修身攻略】（講者：星級健身導師 ｜李綺雯）" },
+            { index: 10, name: "【兄弟姊妹團工作分配 + MC 實戰術】（講者：婚禮細節之鬼 ｜MC Alan Li ）" },
+            { index: 11, name: "【Big Day 全流程速成班】（講者：專業Wedding planner｜Michelle Ng）" },
+            { index: 12, name: "【Pre-Wedding婚攝大師班】（講者：Jason Pang Gallery｜Jason Pang ）" },
+            { index: 13, name: "【韓風室內婚攝美學速成班】" },
+            { index: 14, name: "【台灣小清新婚攝夢幻攻略】" },
+            { index: 15, name: "【Big Day 攝影實戰指南】" },
+            { index: 16, name: "【新郎兄弟禮服搭配專修班】" },
+            { index: 17, name: "【新娘上鏡妝容示範班】現場Model示範" },
+            { index: 18, name: "【婚紗身型配對術】" },
+            { index: 19, name: "【海外Pre-Wedding 全方位研修班】" }
         ];
 
         async function searchRegistration() {
@@ -95,10 +85,11 @@
                     const card = document.createElement('div');
                     card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
 
-                    // 檢查哪些課程是 TRUE
+                    // 檢查選修了哪些課程
                     let selectedCourses = [];
                     courseColumns.forEach(course => {
-                        if (record[course.col] === true || record[course.col] === 'TRUE' || record[course.col] === 'true') {
+                        const cellValue = record.rawCells[course.index];
+                        if (cellValue === true || cellValue === 'TRUE' || cellValue === 'true') {
                             selectedCourses.push(course.name);
                         }
                     });
@@ -138,12 +129,12 @@
             } catch (error) {
                 loadingStatus.classList.add('hidden');
                 console.error("Error details:", error);
-                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取錯誤，請稍後再試。若問題持續，請檢查 Google Sheet 是否維持公開。</div>`;
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取錯誤，請稍後再試。</div>`;
             }
         }
 
         async function fetchSheetData(sheetId, phoneNumber) {
-            // 使用 SQL 語法：選擇所有欄位，條件是 D 欄等於輸入的電話
+            // 💡 修正關鍵：改用最純粹的 SELECT *，完全不向 Google Sheets API 傳遞任何含有中文或特殊符號的標題名稱
             const tqUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tq=` + encodeURIComponent(`SELECT * WHERE D = '${phoneNumber}'`);
             
             const response = await fetch(tqUrl);
@@ -151,40 +142,30 @@
             
             const text = await response.text();
             
-            // 解析 Google API 的 JSON 格式
             const startIdx = text.indexOf("google.visualization.Query.setResponse(");
             if (startIdx === -1) return [];
             
             const jsonString = text.substring(startIdx + 38, text.length - 2);
             const json = JSON.parse(jsonString);
 
-            if (json.status === 'error' || !json.table) {
+            if (json.status === 'error' || !json.table || !json.table.rows) {
                 return [];
             }
 
             const rows = json.table.rows;
-            
-            // 轉換字母索引 (0->A, 1->B, 2->C...)
-            const getColLetter = (index) => String.fromCharCode(65 + index);
 
             return rows.map(row => {
-                let item = {};
-                row.c.forEach((cell, i) => {
-                    const letter = getColLetter(i);
-                    const val = cell ? cell.v : null;
-                    
-                    // 將常用欄位對照進去
-                    if (letter === columnsMapping.id) item.id = val;
-                    if (letter === columnsMapping.time) item.time = val;
-                    if (letter === columnsMapping.name) item.name = val;
-                    if (letter === columnsMapping.phone) item.phone = val;
-                    if (letter === columnsMapping.email) item.email = val;
-                    if (letter === columnsMapping.type) item.type = val;
-                    
-                    // 儲存原始字母欄位（例如 item['H'] = true）供課程比對
-                    item[letter] = val;
-                });
-                return item;
+                // 將一列中所有儲存格的值提取為一個純陣列
+                let cells = row.c.map(cell => cell ? cell.v : null);
+                
+                return {
+                    time: cells[1],      // B欄：Submission time
+                    name: cells[2],      // C欄：中文姓名
+                    phone: cells[3],     // D欄：聯絡電話
+                    email: cells[4],     // E欄：Email
+                    type: cells[6],      // G欄：需要登記參加
+                    rawCells: cells      // 保留完整陣列供後續欄位 Index 比對
+                };
             });
         }
     </script>
