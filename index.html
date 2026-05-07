@@ -22,18 +22,18 @@
         </div>
 
         <div id="loadingStatus" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">
-            🔍 正在實時檢索兩張工作表，請稍候...
+            🔄 正在實時安全串接兩張工作表，請稍候...
         </div>
 
         <div id="resultArea" class="space-y-6"></div>
     </div>
 
     <script>
-        // Google Sheet ID
+        // 你的 Google Sheet 識別碼
         const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
         const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
 
-        // 定義我們要尋找的目標課程名稱
+        // 核心目標課程關鍵字
         const targetCourses = [
             "【婚宴合約避雷速成班】",
             "【中式婚禮禮儀必修課】",
@@ -64,10 +64,10 @@
             loadingStatus.classList.remove('hidden');
 
             try {
-                // 同時查詢兩張表
+                // 改用純 CSV 流下載，100% 繞過 Google API 的中文字元阻擋機制
                 const [data1, data2] = await Promise.all([
-                    fetchSheetData(SHEET_ID_1, phone),
-                    fetchSheetData(SHEET_ID_2, phone)
+                    fetchSheetCSV(SHEET_ID_1, phone),
+                    fetchSheetCSV(SHEET_ID_2, phone)
                 ]);
 
                 loadingStatus.classList.add('hidden');
@@ -120,86 +120,321 @@
             } catch (error) {
                 loadingStatus.classList.add('hidden');
                 console.error("Error details:", error);
-                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取錯誤，請稍後再試。</div>`;
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">連線失敗！請確保 Google 試算表共用設定為「知道連結的任何人皆可檢視」。</div>`;
             }
         }
 
-        async function fetchSheetData(sheetId, phoneNumber) {
-            // 💡 為了應對欄位位置變動，我們先把整張 Sheet 的前 100 筆（或全部）抓下來進行動態分析
-            const tqUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tq=` + encodeURIComponent(`SELECT *`);
+        // 💡 核心技術改動：請求 export?format=csv 格式，徹底免除特殊字元編碼報錯
+        async function fetchSheetCSV(sheetId, phoneNumber) {
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('無法讀取試算表，請檢查權限');
             
-            const response = await fetch(tqUrl);
-            if (!response.ok) throw new Error('Network response was not ok');
+            const csvText = await response.text();
+            const lines = parseCSV(csvText);
+            if (lines.length === 0) return [];
+
+            const headers = lines[0]; // 第一行是表頭
             
-            const text = await response.text();
-            const startIdx = text.indexOf("google.visualization.Query.setResponse(");
-            if (startIdx === -1) return [];
-            
-            const jsonString = text.substring(startIdx + 38, text.length - 2);
-            const json = JSON.parse(jsonString);
+            // 定位主要欄位索引
+            let phoneIdx = headers.findIndex(h => h.includes("聯絡電話"));
+            let timeIdx = headers.findIndex(h => h.includes("Submission time"));
+            let nameIdx = headers.findIndex(h => h.includes("中文姓名"));
+            let emailIdx = headers.findIndex(h => h.includes("Email"));
+            let typeIdx = headers.findIndex(h => h.includes("需要登記參加"));
 
-            if (json.status === 'error' || !json.table || !json.table.rows) {
-                return [];
-            }
+            // 預設防呆
+            if (phoneIdx === -1) phoneIdx = 3;
+            if (timeIdx === -1) timeIdx = 1;
+            if (nameIdx === -1) nameIdx = 2;
+            if (emailIdx === -1) emailIdx = 4;
+            if (typeIdx === -1) typeIdx = 6;
 
-            const headers = json.table.cols;
-            const rows = json.table.rows;
-
-            // 🔍 動態偵測各個關鍵欄位的索引位置位置
-            let phoneIdx = 3; // 預設 D 欄
-            let timeIdx = 1;  // 預設 B 欄
-            let nameIdx = 2;  // 預設 C 欄
-            let emailIdx = 4; // 預設 E 欄
-            let typeIdx = 6;  // 預設 G 欄
-            let courseMappings = []; // 存放找到的課程欄位索引與完整名稱
-
-            headers.forEach((col, idx) => {
-                const label = col.label || "";
-                if (label.includes("聯絡電話")) phoneIdx = idx;
-                if (label.includes("Submission time")) timeIdx = idx;
-                if (label.includes("中文姓名")) nameIdx = idx;
-                if (label.includes("Email")) emailIdx = idx;
-                if (label.includes("需要登記參加")) typeIdx = idx;
-
-                // 檢查是否符合我們的課程清單
+            // 尋找各課程欄位
+            let courseMappings = [];
+            headers.forEach((h, idx) => {
                 targetCourses.forEach(courseTitle => {
-                    if (label.includes(courseTitle)) {
-                        courseMappings.push({ idx: idx, fullName: label });
+                    if (h.includes(courseTitle)) {
+                        courseMappings.push({ idx: idx, fullName: h });
                     }
                 });
             });
 
-            // 過濾出電話號碼符合的使用者資料
             let matchedRecords = [];
             
-            rows.forEach(row => {
-                const cells = row.c.map(cell => cell ? cell.v : null);
-                
-                // 檢查這列的電話是否匹配 (轉成字串比對，防呆空格)
-                const currentPhone = cells[phoneIdx] ? cells[phoneIdx].toString().trim() : "";
-                if (currentPhone === phoneNumber.toString().trim()) {
-                    
-                    // 收集這名登記人勾選為 TRUE 的課程
+            // 逐行比對電話號碼
+            for (let i = 1; i < lines.length; i++) {
+                const cells = lines[i];
+                if (!cells[phoneIdx]) continue;
+
+                const currentPhone = cells[phoneIdx].toString().replace(/\s+/g, ""); // 去除空格
+                const targetPhone = phoneNumber.toString().replace(/\s+/g, "");
+
+                if (currentPhone === targetPhone) {
                     let userCourses = [];
                     courseMappings.forEach(mapping => {
-                        const val = cells[mapping.idx];
-                        if (val === true || val === 'TRUE' || val === 'true') {
+                        const val = cells[mapping.idx] ? cells[mapping.idx].toUpperCase() : "";
+                        if (val === "TRUE" || val === "1" || val === "Y") {
                             userCourses.push(mapping.fullName);
                         }
                     });
 
                     matchedRecords.push({
-                        time: cells[timeIdx],
-                        name: cells[nameIdx],
+                        time: cells[timeIdx] || "",
+                        name: cells[nameIdx] || "未提供",
                         phone: currentPhone,
-                        email: cells[emailIdx],
-                        type: cells[typeIdx],
+                        email: cells[emailIdx] || "未提供",
+                        type: cells[typeIdx] || "基本登記",
                         courses: userCourses
                     });
                 }
+            }
+            return matchedRecords;
+        }
+
+        // 標準 CSV 解析器（處理欄位內部包含逗號、引號的情況）
+        function parseCSV(text) {
+            let p = '', r = [];
+            let q = false;
+            let row = [''];
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                if (c === '"') {
+                    if (q && text[i+1] === '"') { row[row.length-1] += '"'; i++; }
+                    else { q = !q; }
+                } else if (c === ',') {
+                    if (q) { row[row.length-1] += c; }
+                    else { row.push(''); }
+                } else if (c === '\n' || c === '\r') {
+                    if (c === '\r' && text[i+1] === '\n') { i++; }
+                    if (q) { row[row.length-1] += '\n'; }
+                    else { r.push(row); row = ['']; }
+                } else {
+                    row[row.length-1] += c;
+                }
+            }
+            if (row.length > 1 || row[0] !== '') { r.push(row); }
+            return r;
+        }
+    </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>婚嫁學堂 - 登記人資料查詢系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen py-10 px-4">
+
+    <div class="max-w-4xl mx-auto bg-white rounded-xl shadow-md p-6 sm:p-8">
+        <h1 class="text-2xl sm:text-3xl font-bold text-center text-gray-800 mb-2">🎓 婚嫁學堂登記查詢</h1>
+        <p class="text-center text-gray-500 mb-8 text-sm">請輸入聯絡電話以查找登記人資料及所選課程</p>
+
+        <div class="flex flex-col sm:flex-row gap-3 mb-8">
+            <input type="text" id="phoneInput" placeholder="請輸入聯絡電話 (例如: 54171851)" 
+                   class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-lg">
+            <button onclick="searchRegistration()" 
+                    class="bg-pink-600 hover:bg-pink-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 text-lg shadow-md">
+                立即查詢
+            </button>
+        </div>
+
+        <div id="loadingStatus" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">
+            🔄 正在實時安全串接兩張工作表，請稍候...
+        </div>
+
+        <div id="resultArea" class="space-y-6"></div>
+    </div>
+
+    <script>
+        // 你的 Google Sheet 識別碼
+        const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
+        const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
+
+        // 核心目標課程關鍵字
+        const targetCourses = [
+            "【婚宴合約避雷速成班】",
+            "【中式婚禮禮儀必修課】",
+            "【Big Day 前修身攻略】",
+            "【兄弟姊妹團工作分配 + MC 實戰術】",
+            "【Big Day 全流程速成班】",
+            "【Pre-Wedding婚攝大師班】",
+            "【韓風室內婚攝美學速成班】",
+            "【台灣小清新婚攝夢幻攻略】",
+            "【Big Day 攝影實戰指南】",
+            "【新郎兄弟禮服搭配專修班】",
+            "【新娘上鏡妝容示範班】",
+            "【婚紗身型配對術】",
+            "【海外Pre-Wedding 全方位研修班】"
+        ];
+
+        async function searchRegistration() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            const resultArea = document.getElementById('resultArea');
+            const loadingStatus = document.getElementById('loadingStatus');
+
+            if (!phone) {
+                alert('請輸入聯絡電話！');
+                return;
+            }
+
+            resultArea.innerHTML = '';
+            loadingStatus.classList.remove('hidden');
+
+            try {
+                // 改用純 CSV 流下載，100% 繞過 Google API 的中文字元阻擋機制
+                const [data1, data2] = await Promise.all([
+                    fetchSheetCSV(SHEET_ID_1, phone),
+                    fetchSheetCSV(SHEET_ID_2, phone)
+                ]);
+
+                loadingStatus.classList.add('hidden');
+                const allRecords = [...data1, ...data2];
+
+                if (allRecords.length === 0) {
+                    resultArea.innerHTML = `
+                        <div class="text-center py-8 text-red-500 font-medium text-lg border border-dashed border-red-200 rounded-lg bg-red-50">
+                            找不到與電話「${phone}」相關的登記紀錄。
+                        </div>`;
+                    return;
+                }
+
+                allRecords.forEach((record, index) => {
+                    const card = document.createElement('div');
+                    card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
+
+                    let courseListHTML = '';
+                    if (record.courses && record.courses.length > 0) {
+                        courseListHTML = `<ul class="list-disc pl-5 space-y-1 text-gray-700">`;
+                        record.courses.forEach(c => {
+                            courseListHTML += `<li class="font-medium text-pink-700">${c}</li>`;
+                        });
+                        courseListHTML += `</ul>`;
+                    } else {
+                        courseListHTML = `<p class="text-gray-400 italic">未勾選選修課程 (可能僅登記入場參觀)</p>`;
+                    }
+
+                    card.innerHTML = `
+                        <div class="flex items-center justify-between border-b pb-3 mb-4">
+                            <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-pink-100 text-pink-800">
+                                登記紀錄 #${index + 1}
+                            </span>
+                            <span class="text-sm text-gray-400">${record.time || ''}</span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
+                            <div><strong class="text-gray-800">中文姓名：</strong> ${record.name || '未提供'}</div>
+                            <div><strong class="text-gray-800">聯絡電話：</strong> ${record.phone || phone}</div>
+                            <div><strong class="text-gray-800">Email：</strong> ${record.email || '未提供'}</div>
+                            <div><strong class="text-gray-800">登記類型：</strong> ${record.type || '基本登記'}</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
+                            <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
+                            ${courseListHTML}
+                        </div>
+                    `;
+                    resultArea.appendChild(card);
+                });
+
+            } catch (error) {
+                loadingStatus.classList.add('hidden');
+                console.error("Error details:", error);
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">連線失敗！請確保 Google 試算表共用設定為「知道連結的任何人皆可檢視」。</div>`;
+            }
+        }
+
+        // 💡 核心技術改動：請求 export?format=csv 格式，徹底免除特殊字元編碼報錯
+        async function fetchSheetCSV(sheetId, phoneNumber) {
+            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('無法讀取試算表，請檢查權限');
+            
+            const csvText = await response.text();
+            const lines = parseCSV(csvText);
+            if (lines.length === 0) return [];
+
+            const headers = lines[0]; // 第一行是表頭
+            
+            // 定位主要欄位索引
+            let phoneIdx = headers.findIndex(h => h.includes("聯絡電話"));
+            let timeIdx = headers.findIndex(h => h.includes("Submission time"));
+            let nameIdx = headers.findIndex(h => h.includes("中文姓名"));
+            let emailIdx = headers.findIndex(h => h.includes("Email"));
+            let typeIdx = headers.findIndex(h => h.includes("需要登記參加"));
+
+            // 預設防呆
+            if (phoneIdx === -1) phoneIdx = 3;
+            if (timeIdx === -1) timeIdx = 1;
+            if (nameIdx === -1) nameIdx = 2;
+            if (emailIdx === -1) emailIdx = 4;
+            if (typeIdx === -1) typeIdx = 6;
+
+            // 尋找各課程欄位
+            let courseMappings = [];
+            headers.forEach((h, idx) => {
+                targetCourses.forEach(courseTitle => {
+                    if (h.includes(courseTitle)) {
+                        courseMappings.push({ idx: idx, fullName: h });
+                    }
+                });
             });
 
+            let matchedRecords = [];
+            
+            // 逐行比對電話號碼
+            for (let i = 1; i < lines.length; i++) {
+                const cells = lines[i];
+                if (!cells[phoneIdx]) continue;
+
+                const currentPhone = cells[phoneIdx].toString().replace(/\s+/g, ""); // 去除空格
+                const targetPhone = phoneNumber.toString().replace(/\s+/g, "");
+
+                if (currentPhone === targetPhone) {
+                    let userCourses = [];
+                    courseMappings.forEach(mapping => {
+                        const val = cells[mapping.idx] ? cells[mapping.idx].toUpperCase() : "";
+                        if (val === "TRUE" || val === "1" || val === "Y") {
+                            userCourses.push(mapping.fullName);
+                        }
+                    });
+
+                    matchedRecords.push({
+                        time: cells[timeIdx] || "",
+                        name: cells[nameIdx] || "未提供",
+                        phone: currentPhone,
+                        email: cells[emailIdx] || "未提供",
+                        type: cells[typeIdx] || "基本登記",
+                        courses: userCourses
+                    });
+                }
+            }
             return matchedRecords;
+        }
+
+        // 標準 CSV 解析器（處理欄位內部包含逗號、引號的情況）
+        function parseCSV(text) {
+            let p = '', r = [];
+            let q = false;
+            let row = [''];
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                if (c === '"') {
+                    if (q && text[i+1] === '"') { row[row.length-1] += '"'; i++; }
+                    else { q = !q; }
+                } else if (c === ',') {
+                    if (q) { row[row.length-1] += c; }
+                    else { row.push(''); }
+                } else if (c === '\n' || c === '\r') {
+                    if (c === '\r' && text[i+1] === '\n') { i++; }
+                    if (q) { row[row.length-1] += '\n'; }
+                    else { r.push(row); row = ['']; }
+                } else {
+                    row[row.length-1] += c;
+                }
+            }
+            if (row.length > 1 || row[0] !== '') { r.push(row); }
+            return r;
         }
     </script>
 </body>
