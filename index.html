@@ -5,65 +5,152 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>線上點餐系統</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* 隱藏滾動條但保持功能 */
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
 </head>
-<body class="bg-gray-50 min-h-screen">
+<body class="bg-gray-50 min-h-screen text-gray-800 antialiased">
 
     <div class="min-h-screen flex flex-col max-w-md mx-auto bg-white shadow-lg relative pb-24">
         
-        <header class="bg-white p-4 border-b border-gray-100 flex items-center justify-between sticky top-0 z-10">
+        <header class="bg-white px-4 py-3 border-b border-gray-100 flex items-center justify-between sticky top-0 z-30">
             <div class="flex items-center space-x-2">
-                <span class="bg-red-100 text-red-600 text-xs font-bold px-2.5 py-1 rounded">Closed Today</span>
-                <span class="bg-gray-100 text-gray-700 text-xs font-medium px-2.5 py-1 rounded">Pick Up</span>
+                <span class="bg-rose-50 text-rose-600 text-xs font-bold px-2.5 py-1 rounded">今日已打烊</span>
+                <span class="bg-gray-100 text-gray-700 text-xs font-medium px-2.5 py-1 rounded">外帶自取</span>
             </div>
-            <div class="flex items-center space-x-3 text-sm text-gray-600">
-                <button class="hover:underline font-medium">Store Information</button>
-                <span class="border-l h-4 border-gray-300"></span>
-                <button class="border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold">EN</button>
+            <div class="flex items-center space-x-3 text-sm text-gray-500">
+                <button onclick="switchPage('home')" class="hover:text-gray-900 font-medium">店家資訊</button>
+                <span class="border-l h-3 border-gray-300"></span>
+                <button class="border border-gray-300 rounded px-1.5 py-0.5 text-xs font-bold text-gray-700">EN</button>
             </div>
         </header>
 
-        <main id="page-home" class="page-content flex-1 p-4 overflow-y-auto">
-            <div class="bg-gradient-to-r from-emerald-500 to-teal-600 text-white p-6 rounded-2xl shadow-sm mb-6">
-                <h1 class="text-2xl font-bold mb-2">歡迎光臨！</h1>
-                <p class="text-sm opacity-90">今天想吃點什麼呢？點擊下方菜單開始點餐。</p>
+        <main id="page-home" class="page-content hidden flex-1 p-4 overflow-y-auto">
+            <div class="rounded-2xl overflow-hidden shadow-sm mb-4 relative">
+                <img src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600" class="w-full h-40 object-cover" alt="Store Banner">
+                <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
+                    <h1 class="text-xl font-bold text-white">我的客製化餐館</h1>
+                </div>
             </div>
-            <h3 class="font-bold text-gray-800 mb-3">最新公告</h3>
-            <div class="bg-gray-50 border border-gray-100 p-4 rounded-xl text-sm text-gray-600 mb-4">
-                📢 今日因設備維護，暫不開放線上點餐，僅供瀏覽菜單。
+            
+            <div class="space-y-4 text-sm">
+                <div class="bg-amber-50 text-amber-800 p-3 rounded-xl border border-amber-100">
+                    💰 本店提供消費滿 $500 免運費服務！
+                </div>
+                <div class="border-b pb-3">
+                    <h3 class="font-bold text-base mb-1">營業時間</h3>
+                    <p class="text-gray-600">週一至週日 11:00 - 20:00</p>
+                </div>
+                <div class="border-b pb-3">
+                    <h3 class="font-bold text-base mb-1">店家地址</h3>
+                    <p class="text-gray-600">台北市信義區幸福路 88 號</p>
+                </div>
+                <button onclick="switchPage('menu')" class="w-full bg-emerald-600 text-white py-3 rounded-xl font-bold hover:bg-emerald-700 transition shadow-sm mt-4">
+                    開始點餐 ➔
+                </button>
             </div>
-            <button onclick="switchPage('menu')" class="w-full bg-gray-900 text-white py-3 rounded-xl font-bold shadow-sm hover:bg-gray-800 transition">
-                前往瀏覽菜單 ➔
-            </button>
         </main>
 
-        <main id="page-menu" class="page-content hidden flex-1 p-4 overflow-y-auto">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">線上菜單</h2>
-            <div id="product-list" class="space-y-4"></div>
+        <main id="page-menu" class="page-content flex-1 flex flex-col overflow-hidden">
+            <div class="bg-white border-b border-gray-100 sticky top-[49px] z-20 flex overflow-x-auto no-scrollbar px-4 py-2.5 space-x-2">
+                <button id="cat-btn-1" onclick="scrollToCategory('cat-1')" class="cat-tab-btn whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium bg-emerald-600 text-white">熱門主食</button>
+                <button id="cat-btn-2" onclick="scrollToCategory('cat-2')" class="cat-tab-btn whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">精選小吃</button>
+                <button id="cat-btn-3" onclick="scrollToCategory('cat-3')" class="cat-tab-btn whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200">特調飲品</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 space-y-6" id="menu-scroll-container">
+                
+                <div id="cat-1" class="category-section">
+                    <h3 class="font-bold text-gray-500 text-xs tracking-wider mb-3">熱門主食</h3>
+                    <div class="space-y-3">
+                        <div onclick="openModal(1)" class="bg-white rounded-xl p-3 flex shadow-xs border border-gray-100 cursor-pointer hover:border-gray-300 transition">
+                            <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300" class="w-20 h-20 object-cover rounded-lg flex-shrink-0" />
+                            <div class="ml-3 flex flex-col justify-between flex-1">
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-base">招牌經典牛肉堡</h4>
+                                    <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">多汁牛肉排搭配秘製醬汁</p>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-emerald-600 font-bold">$180</span>
+                                    <div id="action-1" onclick="event.stopPropagation();">
+                                        <button onclick="openModal(1)" class="bg-gray-950 text-white text-xs px-3 py-1.5 rounded-full font-bold">＋ 加入</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cat-2" class="category-section">
+                    <h3 class="font-bold text-gray-500 text-xs tracking-wider mb-3">精選小吃</h3>
+                    <div class="space-y-3">
+                        <div onclick="openModal(2)" class="bg-white rounded-xl p-3 flex shadow-xs border border-gray-100 cursor-pointer hover:border-gray-300 transition">
+                            <img src="https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=300" class="w-20 h-20 object-cover rounded-lg flex-shrink-0" />
+                            <div class="ml-3 flex flex-col justify-between flex-1">
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-base">美式脆薯</h4>
+                                    <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">現炸金黃酥脆，外酥內軟</p>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-emerald-600 font-bold">$60</span>
+                                    <div id="action-2" onclick="event.stopPropagation();">
+                                        <button onclick="openModal(2)" class="bg-gray-950 text-white text-xs px-3 py-1.5 rounded-full font-bold">＋ 加入</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="cat-3" class="category-section">
+                    <h3 class="font-bold text-gray-500 text-xs tracking-wider mb-3">特調飲品</h3>
+                    <div class="space-y-3">
+                        <div onclick="openModal(3)" class="bg-white rounded-xl p-3 flex shadow-xs border border-gray-100 cursor-pointer hover:border-gray-300 transition">
+                            <img src="https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=300" class="w-20 h-20 object-cover rounded-lg flex-shrink-0" />
+                            <div class="ml-3 flex flex-col justify-between flex-1">
+                                <div>
+                                    <h4 class="font-bold text-gray-900 text-base">冰美式咖啡</h4>
+                                    <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">嚴選頂級阿拉比卡豆烘焙</p>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-emerald-600 font-bold">$75</span>
+                                    <div id="action-3" onclick="event.stopPropagation();">
+                                        <button onclick="openModal(3)" class="bg-gray-950 text-white text-xs px-3 py-1.5 rounded-full font-bold">＋ 加入</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
         </main>
 
         <main id="page-orders" class="page-content hidden flex-1 p-4 overflow-y-auto">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">我的訂單</h2>
-            <div class="flex flex-col items-center justify-center pt-12 text-gray-400">
+            <h2 class="text-xl font-bold text-gray-900 mb-4">歷史訂單</h2>
+            <div class="flex flex-col items-center justify-center pt-20 text-gray-400">
                 <span class="text-5xl mb-3">🛍️</span>
-                <p class="text-sm">目前沒有進行中的訂單</p>
+                <p class="text-sm">尚未有任何點餐紀錄</p>
             </div>
         </main>
 
         <main id="page-profile" class="page-content hidden flex-1 p-4 overflow-y-auto">
-            <h2 class="text-xl font-bold text-gray-800 mb-4">會員中心</h2>
-            <div class="bg-gray-50 p-4 rounded-xl flex items-center space-x-3 border border-gray-100 mb-4">
-                <div class="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center text-xl text-white font-bold">G</div>
+            <h2 class="text-xl font-bold text-gray-900 mb-4">會員中心</h2>
+            <div class="bg-gray-50 p-4 rounded-xl flex items-center space-x-3 border border-gray-100 mb-6">
+                <div class="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center text-xl font-bold text-gray-500">G</div>
                 <div>
-                    <h4 class="font-bold text-gray-800">GUEST 訪客</h4>
-                    <p class="text-xs text-gray-500">登入後即可同步訂單紀錄</p>
+                    <h4 class="font-bold text-gray-800">訪客會員</h4>
+                    <p class="text-xs text-gray-400">註冊登入以保留紅利點數</p>
                 </div>
             </div>
-            <button onclick="alert('登入功能需要串接後台資料庫唷！')" class="w-full border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition">
-                登入 / 註冊
+            <button onclick="alert('全客製化後台系統串接，請聯繫工程師設定資料庫。')" class="w-full bg-gray-900 text-white py-2.5 rounded-xl text-sm font-bold hover:bg-gray-800 transition">
+                會員登入 / 註冊
             </button>
         </main>
 
-        <div id="cart-bar" class="hidden fixed bottom-18 left-0 right-0 max-w-sm mx-auto bg-emerald-600 text-white mx-4 rounded-xl p-3 flex justify-between items-center shadow-lg z-20">
+        <div id="cart-bar" class="hidden fixed bottom-18 left-0 right-0 max-w-sm mx-auto bg-emerald-600 text-white mx-4 rounded-xl p-3 flex justify-between items-center shadow-lg z-40">
             <div class="flex items-center space-x-2">
                 <span id="cart-count" class="bg-emerald-800 text-white text-xs font-bold px-2 py-0.5 rounded-full">0</span>
                 <span class="font-medium text-sm">已加入購物車</span>
@@ -74,135 +161,189 @@
             </button>
         </div>
 
-        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-200 flex justify-around py-2 z-10">
-            <button id="nav-home" onclick="switchPage('home')" class="nav-btn flex flex-col items-center text-gray-400 hover:text-gray-800">
+        <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-gray-100 flex justify-around py-2 z-30">
+            <button id="nav-home" onclick="switchPage('home')" class="nav-btn flex flex-col items-center text-gray-400 hover:text-gray-900 transition">
                 <span class="text-xl">🏠</span><span class="text-xs mt-0.5">Home</span>
             </button>
-            <button id="nav-menu" onclick="switchPage('menu')" class="nav-btn flex flex-col items-center text-emerald-600 font-medium">
+            <button id="nav-menu" onclick="switchPage('menu')" class="nav-btn flex flex-col items-center text-emerald-600 font-medium transition">
                 <span class="text-xl">📋</span><span class="text-xs mt-0.5">Menu</span>
             </button>
-            <button id="nav-orders" onclick="switchPage('orders')" class="nav-btn flex flex-col items-center text-gray-400 hover:text-gray-800">
+            <button id="nav-orders" onclick="switchPage('orders')" class="nav-btn flex flex-col items-center text-gray-400 hover:text-gray-900 transition">
                 <span class="text-xl">🛍️</span><span class="text-xs mt-0.5">Orders</span>
             </button>
-            <button id="nav-profile" onclick="switchPage('profile')" class="nav-btn flex flex-col items-center text-gray-400 hover:text-gray-800">
+            <button id="nav-profile" onclick="switchPage('profile')" class="nav-btn flex flex-col items-center text-gray-400 hover:text-gray-900 transition">
                 <span class="text-xl">👤</span><span class="text-xs mt-0.5">Profile</span>
             </button>
         </nav>
 
     </div>
 
+    <div id="product-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-end justify-center p-0 transition-opacity">
+        <div class="bg-white w-full max-w-md rounded-t-2xl max-h-[85vh] overflow-y-auto flex flex-col">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center sticky top-0 bg-white">
+                <h3 id="modal-product-name" class="font-bold text-lg text-gray-900">商品名稱</h3>
+                <button onclick="closeModal()" class="text-gray-400 text-2xl hover:text-gray-600">✕</button>
+            </div>
+            
+            <div class="p-4 space-y-6 flex-1 overflow-y-auto">
+                <img id="modal-product-image" src="" class="w-full h-48 object-cover rounded-xl mb-2">
+                <p id="modal-product-desc" class="text-sm text-gray-500"></p>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-2">客製化備註</label>
+                        <input type="text" placeholder="例如：不加醬、去冰、加蛋..." class="w-full border border-gray-200 rounded-xl p-3 text-sm focus:outline-emerald-600">
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+                <div class="flex items-center space-x-3 bg-white border border-gray-200 rounded-full p-1.5">
+                    <button onclick="changeModalQty(-1)" class="w-8 h-8 rounded-full bg-gray-100 font-bold flex items-center justify-center">-</button>
+                    <span id="modal-qty" class="font-bold w-4 text-center">1</span>
+                    <button onclick="changeModalQty(1)" class="w-8 h-8 rounded-full bg-gray-950 text-white font-bold flex items-center justify-center">+</button>
+                </div>
+                <button onclick="confirmAddToCart()" class="bg-emerald-600 text-white px-6 py-3 rounded-full font-bold text-sm hover:bg-emerald-700 transition">
+                    加入購物車 <span id="modal-total-price">$0</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // 1. 商品資料
-        const products = [
-            { id: 1, name: '招牌經典牛肉堡', price: 180, description: '多汁牛肉排搭配秘製醬汁', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500' },
-            { id: 2, name: '美式脆薯', price: 60, description: '現炸金黃酥脆', image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500' },
-            { id: 3, name: '冰美式咖啡', price: 75, description: '嚴選阿拉比卡豆', image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500' }
-        ];
+        const products = {
+            1: { id: 1, name: '招牌經典牛肉堡', price: 180, description: '多汁牛肉排搭配秘製醬汁', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500' },
+            2: { id: 2, name: '美式脆薯', price: 60, description: '現炸金黃酥脆，外酥內軟', image: 'https://images.unsplash.com/photo-1573080496219-bb080dd4f877?w=500' },
+            3: { id: 3, name: '冰美式咖啡', price: 75, description: '嚴選頂級阿拉比卡豆烘焙', image: 'https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=500' }
+        };
 
-        let cart = {}; // 購物車狀態 { 商品ID: 數量 }
+        let cart = {}; 
+        let currentModalProductId = null;
+        let currentModalQty = 1;
 
-        // 2. 多頁面切換邏輯
+        // 1. 頁面切換機制
         function switchPage(pageName) {
-            // 隱藏所有頁面
             document.querySelectorAll('.page-content').forEach(el => el.classList.add('hidden'));
-            // 顯示點選的頁面
             document.getElementById(`page-${pageName}`).classList.remove('hidden');
 
-            // 重設所有導覽列按鈕顏色
             document.querySelectorAll('.nav-btn').forEach(el => {
                 el.classList.remove('text-emerald-600', 'font-medium');
                 el.classList.add('text-gray-400');
             });
-            // 高亮目前選中的按鈕
             const activeNav = document.getElementById(`nav-${pageName}`);
-            activeNav.classList.remove('text-gray-400');
-            activeNav.classList.add('text-emerald-600', 'font-medium');
+            if(activeNav) {
+                activeNav.classList.remove('text-gray-400');
+                activeNav.classList.add('text-emerald-600', 'font-medium');
+            }
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        // 3. 渲染商品列表
-        function renderProducts() {
-            const container = document.getElementById('product-list');
-            if(!container) return;
+        // 2. 錨點滾動連動（點擊分類，菜單自動滑動）
+        function scrollToCategory(catId) {
+            const element = document.getElementById(catId);
+            const container = document.getElementById('menu-scroll-container');
+            if (element && container) {
+                const topPos = element.offsetTop - container.offsetTop;
+                container.scrollTo({ top: topPos, behavior: 'smooth' });
+            }
+
+            // 更新按鈕高亮狀態
+            document.querySelectorAll('.cat-tab-btn').forEach(btn => {
+                btn.classList.remove('bg-emerald-600', 'text-white');
+                btn.classList.add('bg-gray-100', 'text-gray-600');
+            });
+            event.target.classList.remove('bg-gray-100', 'text-gray-600');
+            event.target.classList.add('bg-emerald-600', 'text-white');
+        }
+
+        // 3. 彈出客製化選單視窗 (Modal)
+        function openModal(productId) {
+            const product = products[productId];
+            currentModalProductId = productId;
+            currentModalQty = cart[productId] || 1;
+
+            document.getElementById('modal-product-name').innerText = product.name;
+            document.getElementById('modal-product-desc').innerText = product.description;
+            document.getElementById('modal-product-image').src = product.image;
             
-            container.innerHTML = products.map(p => {
-                const quantity = cart[p.id] || 0;
-                
-                const actionButton = quantity > 0  
-                    ? `<div class="flex items-center space-x-2 bg-gray-100 rounded-full p-1 border border-gray-200">
-                        <button onclick="updateCart(${p.id}, -1)" class="w-6 h-6 rounded-full bg-white flex items-center justify-center text-gray-600 font-bold hover:bg-gray-200">-</button>
-                        <span class="text-xs font-bold text-gray-800 w-4 text-center">${quantity}</span>
-                        <button onclick="updateCart(${p.id}, 1)" class="w-6 h-6 rounded-full bg-gray-900 text-white flex items-center justify-center font-bold hover:bg-gray-800">+</button>
-                       </div>`
-                    : `<button onclick="updateCart(${p.id}, 1)" class="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-full hover:bg-gray-800 transition shadow-sm">＋ 加入</button>`;
-
-                return `
-                    <div class="bg-white rounded-xl p-3 flex shadow-sm border border-gray-100 transition-all hover:border-gray-200">
-                        <img src="${p.image}" alt="${p.name}" class="w-24 h-24 object-cover rounded-lg bg-gray-100 flex-shrink-0" />
-                        <div class="ml-3 flex flex-col justify-between flex-1">
-                            <div>
-                                <h3 class="font-semibold text-gray-800 text-base">${p.name}</h3>
-                                <p class="text-xs text-gray-500 mt-1 line-clamp-2">${p.description}</p>
-                            </div>
-                            <div class="flex justify-between items-center mt-2">
-                                <span class="text-emerald-600 font-bold">$${p.price}</span>
-                                <div>${actionButton}</div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }).join('');
+            updateModalUI();
+            document.getElementById('product-modal').classList.remove('hidden');
         }
 
-        // 4. 更新購物車數量
-        function updateCart(productId, change) {
-            const currentQty = cart[productId] || 0;
-            const newQty = currentQty + change;
+        function closeModal() {
+            document.getElementById('product-modal').classList.add('hidden');
+        }
+
+        function changeModalQty(change) {
+            currentModalQty += change;
+            if (currentModalQty < 1) currentModalQty = 1;
+            updateModalUI();
+        }
+
+        function updateModalUI() {
+            document.getElementById('modal-qty').innerText = currentModalQty;
+            const price = products[currentModalProductId].price * currentModalQty;
+            document.getElementById('modal-total-price').innerText = `$${price}`;
+        }
+
+        // 4. 確認加入購物車後，主頁面即時變更按鈕為加減樣式
+        function confirmAddToCart() {
+            cart[currentModalProductId] = currentModalQty;
+            
+            // 更新主菜單畫面的按鈕樣式
+            const actionContainer = document.getElementById(`action-${currentModalProductId}`);
+            actionContainer.innerHTML = `
+                <div class="flex items-center space-x-2 bg-gray-100 rounded-full p-1 border border-gray-200">
+                    <button onclick="updateCartDirect(${currentModalProductId}, -1)" class="w-6 h-6 rounded-full bg-white flex items-center justify-center text-gray-600 font-bold">-</button>
+                    <span class="text-xs font-bold text-gray-800 w-4 text-center">${currentModalQty}</span>
+                    <button onclick="updateCartDirect(${currentModalProductId}, 1)" class="w-6 h-6 rounded-full bg-gray-950 text-white flex items-center justify-center font-bold">+</button>
+                </div>
+            `;
+
+            updateCartBar();
+            closeModal();
+        }
+
+        // 主介面上的直覺加減按鈕
+        function updateCartDirect(productId, change) {
+            let currentQty = cart[productId] || 0;
+            let newQty = currentQty + change;
 
             if (newQty <= 0) {
                 delete cart[productId];
+                document.getElementById(`action-${productId}`).innerHTML = `
+                    <button onclick="openModal(${productId})" class="bg-gray-950 text-white text-xs px-3 py-1.5 rounded-full font-bold">＋ 加入</button>
+                `;
             } else {
                 cart[productId] = newQty;
+                document.getElementById(`action-${productId}`).querySelector('span').innerText = newQty;
             }
-
-            renderProducts();
             updateCartBar();
         }
 
-        // 5. 更新購物車通知條
+        // 5. 購物車條更新
         function updateCartBar() {
             const cartBar = document.getElementById('cart-bar');
-            const cartCount = document.getElementById('cart-count');
-            const cartTotal = document.getElementById('cart-total');
-            
             let totalItems = 0;
             let totalPrice = 0;
 
             for (const id in cart) {
-                const product = products.find(p => p.id == id);
-                if (product) {
-                    totalItems += cart[id];
-                    totalPrice += product.price * cart[id];
-                }
+                totalItems += cart[id];
+                totalPrice += products[id].price * cart[id];
             }
 
             if (totalItems > 0) {
                 cartBar.classList.remove('hidden');
-                cartCount.innerText = totalItems;
-                cartTotal.innerText = `$${totalPrice}`;
+                document.getElementById('cart-count').innerText = totalItems;
+                document.getElementById('cart-total').innerText = `$${totalPrice}`;
             } else {
                 cartBar.classList.add('hidden');
             }
         }
 
         function checkout() {
-            let totalPrice = document.getElementById('cart-total').innerText;
-            alert(`感謝點餐！即將為您處理訂單，總金額為：${totalPrice}`);
+            alert(`訂單送出成功！已模擬連接金流。`);
         }
-
-        // 初始化
-        renderProducts();
-        // 預設先顯示 menu 頁面
-        switchPage('menu');
     </script>
 </body>
 </html>
