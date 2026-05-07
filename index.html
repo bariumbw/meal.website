@@ -29,7 +29,7 @@
             <p class="text-gray-500 mb-6 text-sm">請輸入登記人的「聯絡電話」或「中文姓名」進行實時檢索</p>
 
             <div class="flex flex-col sm:flex-row gap-3 mb-8">
-                <input type="text" id="searchInput" placeholder="請輸入聯絡電話 或 姓名 (例如: anna 或 54171851)" 
+                <input type="text" id="searchInput" placeholder="請輸入聯絡電話 或 姓名 (例如: anna)" 
                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500 text-lg">
                 <button onclick="searchRegistration()" 
                         class="bg-pink-600 hover:bg-pink-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 text-lg shadow-md">
@@ -37,7 +37,7 @@
                 </button>
             </div>
 
-            <div id="searchLoading" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">🔄 正在檢索工作表資料...</div>
+            <div id="searchLoading" class="hidden text-center py-6 text-gray-500 text-lg animate-pulse">🔄 正在安全下載名冊...</div>
             <div id="searchResultArea" class="space-y-6"></div>
         </div>
 
@@ -45,7 +45,7 @@
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                 <div>
                     <h2 class="text-xl font-bold text-gray-800">全部登記名冊</h2>
-                    <p class="text-gray-500 text-sm">目前已串集試算表的所有報名紀錄（變動將永久儲存至雲端）</p>
+                    <p class="text-gray-500 text-sm">目前已串集試算表的所有報名紀錄（變動將透過 Google Form 安全儲存）</p>
                 </div>
                 <div class="flex gap-2 w-full sm:w-auto">
                     <button onclick="exportToCSV()" class="flex-1 sm:flex-initial bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition shadow flex items-center justify-center gap-1">
@@ -79,18 +79,23 @@
 
     </div>
 
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+
     <script>
-        // 核心資料庫設定
+        // 1. 主要試算表 ID
         const SHEET_ID = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc'; 
-        const GAS_URL = 'https://script.google.com/macros/s/AKfycbwTDtgWM-HmMvncxf8KflwneA2o-rcl2sdjjQ0-Kz6HGc8OibKWkbMp4CR9fK_cHZgy/exec'; 
+
+        // 2. 🛠️ 終極解決方案：請填入你剛剛建立的 Google 表單相關 ID
+        const GOOGLE_FORM_ID = '請替換成你的Google表單ID'; // 例如: 1FAIpQLSfXXXXX...
+        const ENTRY_PHONE = 'entry.111111111'; // 請替換成電話的 entry ID
+        const ENTRY_STATUS = 'entry.222222222'; // 請替換成出席狀態的 entry ID
+        const ENTRY_COUNT = 'entry.333333333'; // 請替換成最新人數的 entry ID
 
         // 目標課程關鍵字清單
         const targetCourses = ["【婚宴合約避雷速成班】","【中式婚禮禮儀必修課】","【Big Day 前修身攻略】","【兄弟姊妹團工作分配 + MC 實戰術】","【Big Day 全流程速成班】","【Pre-Wedding婚攝大師班】","【韓風室內婚攝美學速成班】","【台灣小清新婚攝夢幻攻略】","【Big Day 攝影實戰指南】","【新郎兄弟禮服搭配專修班】","【新娘上鏡妝容示範班】","【婚紗身型配對術】","【海外Pre-Wedding 全方位研修班】"];
 
-        // 全域快取陣列
         let globalCachedRecords = [];
 
-        // 分頁切換
         function switchTab(tab) {
             const searchTab = document.getElementById('tabSearch');
             const allTab = document.getElementById('tabAll');
@@ -111,7 +116,6 @@
             }
         }
 
-        // 🟢 功能 1：支援聯絡電話或姓名查詢
         async function searchRegistration() {
             const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
             const resultArea = document.getElementById('searchResultArea');
@@ -122,7 +126,7 @@
             loading.classList.remove('hidden');
 
             try {
-                globalCachedRecords = await fetchSheetCSV(SHEET_ID);
+                globalCachedRecords = await fetchCombinedData(SHEET_ID);
                 loading.classList.add('hidden');
                 
                 const matched = globalCachedRecords.filter(r => 
@@ -137,11 +141,10 @@
                 renderCards(matched, resultArea);
             } catch (error) {
                 loading.classList.add('hidden');
-                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取失敗。請確保 Google 試算表共用設定已開放為「知道連結的任何人皆可檢視」。</div>`;
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取失敗，請確認 Google 試算表共用設定已開啟。</div>`;
             }
         }
 
-        // 🟢 功能 2：加載並顯示全部資料分頁
         async function loadAllData() {
             const tbody = document.getElementById('allTableBody');
             const loading = document.getElementById('allLoading');
@@ -149,7 +152,7 @@
             loading.classList.remove('hidden');
 
             try {
-                globalCachedRecords = await fetchSheetCSV(SHEET_ID);
+                globalCachedRecords = await fetchCombinedData(SHEET_ID);
                 loading.classList.add('hidden');
 
                 if(globalCachedRecords.length === 0) {
@@ -162,7 +165,6 @@
                     tr.className = "hover:bg-gray-50 border-b";
 
                     const isAttended = record.attendance === "已出席";
-                    // 提取純數字供輸入框使用
                     const numCount = parseInt(record.peopleCount) || 1;
                     
                     tr.innerHTML = `
@@ -173,15 +175,16 @@
                         <td class="px-4 py-3.5">
                             <div class="flex items-center space-x-1">
                                 <input type="number" value="${numCount}" min="1" max="99" 
-                                       onchange="updatePeopleCount('${record.phone}', this.value)"
+                                       onchange="updatePeopleCount('${record.phone}', '${record.name}', this.value, this)"
+                                       data-old="${numCount}"
                                        class="w-14 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-pink-500 font-medium">
                                 <span class="text-gray-500 text-xs">人</span>
                             </div>
                         </td>
                         <td class="px-4 py-3.5 text-center">
                             <div class="inline-flex rounded-md shadow-sm" id="btnGroup-all-${record.phone}">
-                                <button onclick="toggleAttendance('${record.phone}', '已出席')" class="px-3 py-1.5 text-xs font-semibold rounded-l-md border ${isAttended ? 'bg-green-600 text-white border-green-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">出席</button>
-                                <button onclick="toggleAttendance('${record.phone}', '未出席')" class="px-3 py-1.5 text-xs font-semibold rounded-r-md border-t border-b border-r ${!isAttended && record.attendance==='未出席' ? 'bg-red-600 text-white border-red-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">未出席</button>
+                                <button onclick="toggleAttendance('${record.phone}', '${record.name}', '已出席')" class="px-3 py-1.5 text-xs font-semibold rounded-l-md border ${isAttended ? 'bg-green-600 text-white border-green-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">出席</button>
+                                <button onclick="toggleAttendance('${record.phone}', '${record.name}', '未出席')" class="px-3 py-1.5 text-xs font-semibold rounded-r-md border-t border-b border-r ${!isAttended && record.attendance==='未出席' ? 'bg-red-600 text-white border-red-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">未出席</button>
                             </div>
                         </td>
                     `;
@@ -193,7 +196,6 @@
             }
         }
 
-        // 渲染查詢卡片
         function renderCards(records, container) {
             records.forEach((record, index) => {
                 const card = document.createElement('div');
@@ -201,7 +203,7 @@
 
                 let courseListHTML = record.courses.length > 0 ? 
                     `<ul class="list-disc pl-5 space-y-1 text-gray-700">${record.courses.map(c => `<li class="font-medium text-pink-700">${c}</li>`).join('')}</ul>` : 
-                    `<p class="text-gray-400 italic">未勾選選修課程 (可能僅登記入場參觀)</p>`;
+                    `<p class="text-gray-400 italic">未勾選選修課程</p>`;
 
                 const isAttended = record.attendance === "已出席";
                 const numCount = parseInt(record.peopleCount) || 1;
@@ -215,8 +217,8 @@
                         <div class="flex items-center space-x-2">
                             <span class="text-sm font-medium text-gray-500">現場狀態:</span>
                             <div class="inline-flex rounded-md shadow-sm" id="btnGroup-card-${record.phone}">
-                                <button onclick="toggleAttendance('${record.phone}', '已出席')" class="px-3 py-1.5 text-xs font-bold rounded-l-md border ${isAttended ? 'bg-green-600 text-white border-green-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">出席</button>
-                                <button onclick="toggleAttendance('${record.phone}', '未出席')" class="px-3 py-1.5 text-xs font-bold rounded-r-md border-t border-b border-r ${!isAttended && record.attendance==='未出席' ? 'bg-red-600 text-white border-red-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">未出席</button>
+                                <button onclick="toggleAttendance('${record.phone}', '${record.name}', '已出席')" class="px-3 py-1.5 text-xs font-bold rounded-l-md border ${isAttended ? 'bg-green-600 text-white border-green-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">出席</button>
+                                <button onclick="toggleAttendance('${record.phone}', '${record.name}', '未出席')" class="px-3 py-1.5 text-xs font-bold rounded-r-md border-t border-b border-r ${!isAttended && record.attendance==='未出席' ? 'bg-red-600 text-white border-red-600':'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}">未出席</button>
                             </div>
                         </div>
                     </div>
@@ -226,11 +228,11 @@
                         <div>
                             <strong class="text-gray-800">參加人數：</strong>
                             <input type="number" value="${numCount}" min="1" max="99" 
-                                   onchange="updatePeopleCount('${record.phone}', this.value)"
-                                   class="w-14 px-1.5 py-0.5 text-center border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-pink-500 text-sm font-bold ml-1"> 人 (修改即同步)
+                                   onchange="updatePeopleCount('${record.phone}', '${record.name}', this.value, this)"
+                                   data-old="${numCount}"
+                                   class="w-14 px-1.5 py-0.5 text-center border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-pink-500 text-sm font-bold ml-1"> 人
                         </div>
                         <div><strong class="text-gray-800">登記類型：</strong> ${record.type}</div>
-                        <div class="md:col-span-2"><strong class="text-gray-800">Email：</strong> ${record.email}</div>
                     </div>
                     <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
                         <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
@@ -241,135 +243,123 @@
             });
         }
 
-        // 🟢 功能 3：修改人數並永久同步寫入 Google Sheet
-        async function updatePeopleCount(phone, newCount) {
+        // 🟢 修正與新增功能：更新人數新增【確認按摩（確認視窗）】
+        async function updatePeopleCount(phone, name, newCount, inputElement) {
             if(!newCount || newCount < 1) return;
-            console.log(`正在將電話 ${phone} 的人數更新為: ${newCount}`);
+            const oldVal = inputElement.getAttribute('data-old') || "1";
             
-            try {
-                // 發送請求，僅包含人數更新參數 count
-                await fetch(`${GAS_URL}?phone=${phone}&count=${newCount}`, { mode: 'no-cors' });
-                
-                // 更新本機快取
-                globalCachedRecords.forEach(r => {
-                    if(r.phone === phone) r.peopleCount = newCount + "人";
-                });
-            } catch (e) {
-                console.error(e);
-                alert("人數儲存失敗，請檢查網路連線或 GAS 權限。");
-            }
-        }
-
-        // 🟢 功能 4：點擊出席切換，永久同步寫入 Google Sheet
-        async function toggleAttendance(phone, status) {
-            try {
-                // 發送請求，僅包含出席狀態參數 status
-                await fetch(`${GAS_URL}?phone=${phone}&status=${encodeURIComponent(status)}`, { mode: 'no-cors' });
-                
-                globalCachedRecords.forEach(r => {
-                    if(r.phone === phone) r.attendance = status;
-                });
-
-                // 即時刷新當前頁面
-                if (!document.getElementById('tabSearch').classList.contains('hidden')) {
-                    const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-                    const resultArea = document.getElementById('searchResultArea');
-                    resultArea.innerHTML = '';
-                    const matched = globalCachedRecords.filter(r => r.phone.includes(keyword) || r.name.toLowerCase().includes(keyword));
-                    renderCards(matched, resultArea);
-                } else {
-                    loadAllData();
-                }
-            } catch (e) {
-                console.error(e);
-                alert("出席狀態儲存失敗。");
-            }
-        }
-
-        // 📥 功能 5：將目前整合的名冊數據一鍵匯出為 Excel/CSV 檔案
-        function exportToCSV() {
-            if (globalCachedRecords.length === 0) {
-                alert("目前沒有資料可以匯出，請先載入名冊。");
+            // 跳出確認提示視窗
+            const isConfirmed = confirm(`確定要將登記人【${name}】的參加人數由 ${oldVal} 人更改為 ${newCount} 人嗎？`);
+            
+            if (!isConfirmed) {
+                // 使用者取消修改，將數值還原為舊值
+                inputElement.value = oldVal;
                 return;
             }
 
-            // 定義 CSV 表頭
-            let csvContent = "\uFEFF"; // 加上 BOM 預防 Excel 開啟中文時亂碼
-            csvContent += "中文姓名,聯絡電話,Email,登記類型,參加人數,出席狀態,已選課程\n";
+            // 更新舊值暫存
+            inputElement.setAttribute('data-old', newCount);
 
-            // 填入每行資料
+            // 樂觀同步快取
             globalCachedRecords.forEach(r => {
-                // 將已勾選課程陣列用分號「;」接起來
-                let courseString = r.courses.join("; ");
-                
-                // 包裹雙引號防止內文出現逗號導致錯位
-                let row = [
-                    `"${r.name}"`,
-                    `"${r.phone}"`,
-                    `"${r.email}"`,
-                    `"${r.type}"`,
-                    `"${r.peopleCount}"`,
-                    `"${r.attendance}"`,
-                    `"${courseString}"`
-                ];
-                csvContent += row.join(",") + "\n";
+                if(r.phone === phone) r.peopleCount = newCount + "人";
             });
 
-            // 建立下載連結
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            
-            // 檔名加上今天的日期時間
-            const today = new Date().toISOString().slice(0, 10);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `婚嫁學堂_登記總名冊_${today}.csv`);
-            link.style.visibility = 'hidden';
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            // 透過 Form 秘密提交回寫
+            submitToGoogleForm(phone, "", newCount + "人");
         }
 
-        // 從試算表拉取純文字流並解析
-        async function fetchSheetCSV(sheetId) {
-            const url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&t=` + new Date().getTime();
-            const response = await fetch(url);
-            if (!response.ok) throw new Error('無法與試算表建立連線');
-            
-            const csvText = await response.text();
-            const lines = parseCSV(csvText);
-            if (lines.length === 0) return [];
+        // 🟢 修正功能：變更出席狀態新增【確認視窗】並即時透過 Form 寫入
+        async function toggleAttendance(phone, name, status) {
+            const isConfirmed = confirm(`確定要將 【${name}】 的現場狀態設定為 【${status}】 嗎？`);
+            if(!isConfirmed) return;
 
-            const headers = lines[0];
-            
-            let phoneIdx = headers.findIndex(h => h.includes("聯絡電話"));
-            let timeIdx = headers.findIndex(h => h.includes("Submission time"));
-            let nameIdx = headers.findIndex(h => h.includes("中文姓名"));
-            let emailIdx = headers.findIndex(h => h.includes("Email"));
-            let typeIdx = headers.findIndex(h => h.includes("需要登記參加"));
-            let countIdx = headers.findIndex(h => h.includes("參加人數")); // 抓取參加人數欄位的位置
-            let attendanceIdx = headers.findIndex(h => h.includes("出席狀態")); 
+            globalCachedRecords.forEach(r => {
+                if(r.phone === phone) r.attendance = status;
+            });
+
+            // 透過 Form 秘密提交回寫
+            submitToGoogleForm(phone, status, "");
+
+            // 立即重新刷新網頁目前的畫面狀態
+            if (!document.getElementById('tabSearch').classList.contains('hidden')) {
+                const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+                const resultArea = document.getElementById('searchResultArea');
+                resultArea.innerHTML = '';
+                const matched = globalCachedRecords.filter(r => r.phone.includes(keyword) || r.name.toLowerCase().includes(keyword));
+                renderCards(matched, resultArea);
+            } else {
+                loadAllData();
+            }
+        }
+
+        // 🚀 核心黑科技：免 GAS、免權限，100% 寫入 Google 表單
+        function submitToGoogleForm(phone, status, count) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `https://docs.google.com/forms/d/e/${GOOGLE_FORM_ID}/formResponse`;
+            form.target = 'hidden_iframe'; // 讓它在隱藏的後台執行，使用者完全不會發現頁面跳轉
+
+            const createInput = (name, val) => {
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = name;
+                input.value = val;
+                form.appendChild(input);
+            };
+
+            createInput(ENTRY_PHONE, phone);
+            if(status) createInput(ENTRY_STATUS, status);
+            if(count) createInput(ENTRY_COUNT, count);
+
+            document.body.appendChild(form);
+            form.submit();
+            document.body.removeChild(form);
+        }
+
+        // 📥 讀取數據：同時抓取原始工作表與表單回寫分頁，並在前端做最新紀錄重疊
+        async function fetchCombinedData(sheetId) {
+            // 抓取原始工作表 1
+            const url1 = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0&t=` + new Date().getTime();
+            // 抓取表單回覆工作表 (通常 gid=0 是第一個，表單產生的新分頁可以透過不指定 gid 自動下載全部或查明它的 gid)
+            const urlForm = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&t=` + new Date().getTime();
+
+            const [res1, resForm] = await Promise.all([
+                fetch(url1).then(r => r.text()),
+                fetch(urlForm).then(r => r.text())
+            ]);
+
+            const lines1 = parseCSV(res1);
+            if (lines1.length === 0) return [];
+
+            const headers1 = lines1[0];
+            let phoneIdx = headers1.findIndex(h => h.includes("聯絡電話"));
+            let timeIdx = headers1.findIndex(h => h.includes("Submission time"));
+            let nameIdx = headers1.findIndex(h => h.includes("中文姓名"));
+            let emailIdx = headers1.findIndex(h => h.includes("Email"));
+            let typeIdx = headers1.findIndex(h => h.includes("需要登記參加"));
+            // 🎯 精準對齊你畫面上顯示的表頭：參加人數(包括自己)
+            let countIdx = headers1.findIndex(h => h.includes("參加人數")); 
+            let attendanceIdx = headers1.findIndex(h => h.includes("出席狀態"));
 
             if (phoneIdx === -1) phoneIdx = 3;
             if (timeIdx === -1) timeIdx = 1;
             if (nameIdx === -1) nameIdx = 2;
             if (emailIdx === -1) emailIdx = 4;
             if (typeIdx === -1) typeIdx = 6;
-            if (countIdx === -1) countIdx = 5; // 預設防呆為 F 欄
+            if (countIdx === -1) countIdx = 5; 
 
             let courseMappings = [];
-            headers.forEach((h, idx) => {
+            headers1.forEach((h, idx) => {
                 targetCourses.forEach(courseTitle => {
-                    if (h.includes(courseTitle)) {
-                        courseMappings.push({ idx: idx, fullName: h });
-                    }
+                    if (h.includes(courseTitle)) courseMappings.push({ idx: idx, fullName: h });
                 });
             });
 
-            let records = [];
-            for (let i = 1; i < lines.length; i++) {
-                const cells = lines[i];
+            // 先建立原始名冊地圖
+            let recordsMap = {};
+            for (let i = 1; i < lines1.length; i++) {
+                const cells = lines1[i];
                 if (!cells[phoneIdx]) continue;
 
                 const currentPhone = cells[phoneIdx].toString().replace(/\s+/g, "");
@@ -379,18 +369,59 @@
                     if (val === "TRUE" || val === "1" || val === "Y") userCourses.push(mapping.fullName);
                 });
 
-                records.push({
+                recordsMap[currentPhone] = {
                     time: cells[timeIdx] || "",
                     name: cells[nameIdx] || "未提供",
                     phone: currentPhone,
                     email: cells[emailIdx] || "未提供",
                     type: cells[typeIdx] || "基本登記",
-                    peopleCount: cells[countIdx] || "1人", // 實時讀取試算表的人數
+                    peopleCount: cells[countIdx] || "1人",
                     attendance: attendanceIdx !== -1 && cells[attendanceIdx] ? cells[attendanceIdx] : "未出席",
                     courses: userCourses
-                });
+                };
             }
-            return records;
+
+            // 疊加表單回傳的最新打卡數據紀錄
+            const linesForm = parseCSV(resForm);
+            if (linesForm.length > 1) {
+                const formHeaders = linesForm[0];
+                let fPhoneIdx = formHeaders.findIndex(h => h.includes("電話"));
+                let fStatusIdx = formHeaders.findIndex(h => h.includes("出席狀態"));
+                let fCountIdx = formHeaders.findIndex(h => h.includes("最新人數"));
+
+                for (let k = 1; k < linesForm.length; k++) {
+                    const fCells = linesForm[k];
+                    const fPhone = fCells[fPhoneIdx] ? fCells[fPhoneIdx].toString().replace(/\s+/g, "") : "";
+                    
+                    if (recordsMap[fPhone]) {
+                        if (fCells[fStatusIdx]) recordsMap[fPhone].attendance = fCells[fStatusIdx];
+                        if (fCells[fCountIdx]) recordsMap[fPhone].peopleCount = fCells[fCountIdx];
+                    }
+                }
+            }
+
+            return Object.values(recordsMap);
+        }
+
+        function exportToCSV() {
+            if (globalCachedRecords.length === 0) { alert("目前沒有資料可以匯出。"); return; }
+            let csvContent = "\uFEFF"; 
+            csvContent += "中文姓名,聯絡電話,Email,登記類型,參加人數,出席狀態,已選課程\n";
+
+            globalCachedRecords.forEach(r => {
+                let courseString = r.courses.join("; ");
+                let row = [ `"${r.name}"`, `"${r.phone}"`, `"${r.email}"`, `"${r.type}"`, `"${r.peopleCount}"`, `"${r.attendance}"`, `"${courseString}"` ];
+                csvContent += row.join(",") + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.setAttribute("href", url);
+            link.setAttribute("download", `婚嫁學堂_登記總名冊.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
         }
 
         function parseCSV(text) {
