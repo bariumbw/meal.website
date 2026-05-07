@@ -29,25 +29,35 @@
     </div>
 
     <script>
-        // 🛠️ 請在此處填入你那兩個 Google Sheet 的完整 ID
+        // Google Sheet ID
         const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
         const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
 
-        // 這是 Google 表格內各課程對應的欄位中文名稱 (依據你的欄位結構定義)
+        // 💡 核心修正：改用 Column ID (A, B, C...) 直接對應你試算表上的欄位，避開中文特殊符號問題
+        const columnsMapping = {
+            id: 'A',          // Submission ID
+            time: 'B',        // Submission time
+            name: 'C',        // 中文姓名
+            phone: 'D',       // 聯絡電話
+            email: 'E',       // Email
+            type: 'G'         // 需要登記參加 (例如: 參加【備婚特訓班】)
+        };
+
+        // 課程欄位對應（H欄 到 T欄）
         const courseColumns = [
-            "【婚宴合約避雷速成班】 （講者：前資深宴會經理 ｜ P 叔叔）",
-            "【中式婚禮禮儀必修課】（講者：資深專業大妗｜羅勤芳）",
-            "【Big Day 前修身攻略】（講者：星級健身導師 ｜李綺雯）",
-            "【兄弟姊妹團工作分配 + MC 實戰術】（講者：婚禮細節之鬼 ｜MC Alan Li ）",
-            "【Big Day 全流程速成班】（講者：專業Wedding planner｜Michelle Ng）",
-            "【Pre-Wedding婚攝大師班】（講者：Jason Pang Gallery｜Jason Pang ）",
-            "【韓風室內婚攝美學速成班】",
-            "【台灣小清新婚攝夢幻攻略】",
-            "【Big Day 攝影實戰指南】",
-            "【新郎兄弟禮服搭配專修班】",
-            "【新娘上鏡妝容示範班】現場Model示範",
-            "【婚紗身型配對術】",
-            "【海外Pre-Wedding 全方位研修班】"
+            { col: 'H', name: "【婚宴合約避雷速成班】（講者：前資深宴會經理 ｜ P 叔叔）" },
+            { col: 'I', name: "【中式婚禮禮儀必修課】（講者：資深專業大妗｜羅勤芳）" },
+            { col: 'J', name: "【Big Day 前修身攻略】（講者：星級健身導師 ｜李綺雯）" },
+            { col: 'K', name: "【兄弟姊妹團工作分配 + MC 實戰術】（講者：婚禮細節之鬼 ｜MC Alan Li ）" },
+            { col: 'L', name: "【Big Day 全流程速成班】（講者：專業Wedding planner｜Michelle Ng）" },
+            { col: 'M', name: "【Pre-Wedding婚攝大師班】（講者：Jason Pang Gallery｜Jason Pang ）" },
+            { col: 'N', name: "【韓風室內婚攝美學速成班】" },
+            { col: 'O', name: "【台灣小清新婚攝夢幻攻略】" },
+            { col: 'P', name: "【Big Day 攝影實戰指南】" },
+            { col: 'Q', name: "【新郎兄弟禮服搭配專修班】" },
+            { col: 'R', name: "【新娘上鏡妝容示範班】現場Model示範" },
+            { col: 'S', name: "【婚紗身型配對術】" },
+            { col: 'T', name: "【海外Pre-Wedding 全方位研修班】" }
         ];
 
         async function searchRegistration() {
@@ -60,20 +70,17 @@
                 return;
             }
 
-            // 重設 UI
             resultArea.innerHTML = '';
             loadingStatus.classList.remove('hidden');
 
             try {
-                // 同時向兩張試算表發出異步查詢請求 (實時獲取)
+                // 同時查詢兩張表
                 const [data1, data2] = await Promise.all([
                     fetchSheetData(SHEET_ID_1, phone),
                     fetchSheetData(SHEET_ID_2, phone)
                 ]);
 
                 loadingStatus.classList.add('hidden');
-
-                // 合併兩張表的結果
                 const allRecords = [...data1, ...data2];
 
                 if (allRecords.length === 0) {
@@ -84,20 +91,18 @@
                     return;
                 }
 
-                // 渲染找到的每條登記人資料
                 allRecords.forEach((record, index) => {
                     const card = document.createElement('div');
                     card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
 
-                    // 解析登記人選擇了哪些課程
+                    // 檢查哪些課程是 TRUE
                     let selectedCourses = [];
                     courseColumns.forEach(course => {
-                        if (record[course] && record[course].toString().toUpperCase() === 'TRUE') {
-                            selectedCourses.push(course);
+                        if (record[course.col] === true || record[course.col] === 'TRUE' || record[course.col] === 'true') {
+                            selectedCourses.push(course.name);
                         }
                     });
 
-                    // 建立課程列表 HTML
                     let courseListHTML = '';
                     if (selectedCourses.length > 0) {
                         courseListHTML = `<ul class="list-disc pl-5 space-y-1 text-gray-700">`;
@@ -114,13 +119,13 @@
                             <span class="text-xs font-bold uppercase px-2.5 py-1 rounded-full bg-pink-100 text-pink-800">
                                 登記紀錄 #${index + 1}
                             </span>
-                            <span class="text-sm text-gray-400">${record["Submission time"] || ''}</span>
+                            <span class="text-sm text-gray-400">${record.time || ''}</span>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4 text-sm text-gray-600">
-                            <div><strong class="text-gray-800">中文姓名：</strong> ${record["中文姓名 :"] || record["中文姓名"] || '未提供'}</div>
-                            <div><strong class="text-gray-800">聯絡電話：</strong> ${record["聯絡電話(可接受WhatsApps 通知) :"] || phone}</div>
-                            <div><strong class="text-gray-800">Email：</strong> ${record["Email :"] || record["Email"] || '未提供'}</div>
-                            <div><strong class="text-gray-800">登記類型：</strong> ${record["需要登記參加"] || '基本登記'}</div>
+                            <div><strong class="text-gray-800">中文姓名：</strong> ${record.name || '未提供'}</div>
+                            <div><strong class="text-gray-800">聯絡電話：</strong> ${record.phone || phone}</div>
+                            <div><strong class="text-gray-800">Email：</strong> ${record.email || '未提供'}</div>
+                            <div><strong class="text-gray-800">登記類型：</strong> ${record.type || '基本登記'}</div>
                         </div>
                         <div class="bg-gray-50 p-4 rounded-lg border border-gray-100">
                             <h3 class="font-bold text-gray-800 mb-2 text-sm">📚 已成功登記之課程：</h3>
@@ -132,39 +137,52 @@
 
             } catch (error) {
                 loadingStatus.classList.add('hidden');
-                console.error(error);
-                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取 Google Sheets 發生錯誤，請確認 Sheet 權限已公開。</div>`;
+                console.error("Error details:", error);
+                resultArea.innerHTML = `<div class="text-red-500 text-center py-4 font-semibold">系統讀取錯誤，請稍後再試。若問題持續，請檢查 Google Sheet 是否維持公開。</div>`;
             }
         }
 
-        // 利用 Google Visualization API 實時對特定的 Sheet 進行 SQL-like 查詢
         async function fetchSheetData(sheetId, phoneNumber) {
-            // 注意：你表中的電話欄位在 D 欄 (即第 4 欄)
-            // 這裡使用 SQL 語法：Select * where D = '電話號碼'
+            // 使用 SQL 語法：選擇所有欄位，條件是 D 欄等於輸入的電話
             const tqUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tq=` + encodeURIComponent(`SELECT * WHERE D = '${phoneNumber}'`);
             
             const response = await fetch(tqUrl);
+            if (!response.ok) throw new Error('Network response was not ok');
+            
             const text = await response.text();
             
-            // Google 返回的資料帶有特定的 jsonp 格式包裹，需要進行切片清洗出標準 JSON
-            const jsonString = text.substring(text.indexOf("google.visualization.Query.setResponse(") + 38, text.length - 2);
+            // 解析 Google API 的 JSON 格式
+            const startIdx = text.indexOf("google.visualization.Query.setResponse(");
+            if (startIdx === -1) return [];
+            
+            const jsonString = text.substring(startIdx + 38, text.length - 2);
             const json = JSON.parse(jsonString);
 
-            if (json.status === 'error') {
-                console.error("Google Query Error:", json.errors);
+            if (json.status === 'error' || !json.table) {
                 return [];
             }
 
             const rows = json.table.rows;
-            const cols = json.table.cols;
+            
+            // 轉換字母索引 (0->A, 1->B, 2->C...)
+            const getColLetter = (index) => String.fromCharCode(65 + index);
 
-            // 將表頭欄位與資料列組裝對應成 JavaScript Object
             return rows.map(row => {
                 let item = {};
                 row.c.forEach((cell, i) => {
-                    if (cols[i] && cols[i].label) {
-                        item[cols[i].label] = cell ? cell.v : null;
-                    }
+                    const letter = getColLetter(i);
+                    const val = cell ? cell.v : null;
+                    
+                    // 將常用欄位對照進去
+                    if (letter === columnsMapping.id) item.id = val;
+                    if (letter === columnsMapping.time) item.time = val;
+                    if (letter === columnsMapping.name) item.name = val;
+                    if (letter === columnsMapping.phone) item.phone = val;
+                    if (letter === columnsMapping.email) item.email = val;
+                    if (letter === columnsMapping.type) item.type = val;
+                    
+                    // 儲存原始字母欄位（例如 item['H'] = true）供課程比對
+                    item[letter] = val;
                 });
                 return item;
             });
