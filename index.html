@@ -6,7 +6,6 @@
     <title>線上點餐系統</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <style>
-        /* 隱藏滾動條但保持功能 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -34,15 +33,15 @@
 
         <main id="page-home" class="page-content hidden flex-1 p-4 overflow-y-auto">
             <div class="rounded-2xl overflow-hidden shadow-sm mb-4 relative bg-gray-100 h-40">
-                <img id="store-banner-img" src="" class="w-full h-40 object-cover" alt="Store Banner">
+                <img id="store-banner-img" src="https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600" class="w-full h-40 object-cover" alt="Store Banner">
                 <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-4">
-                    <h1 id="store-name" class="text-xl font-bold text-white">讀取中...</h1>
+                    <h1 id="store-name" class="text-xl font-bold text-white">我的客製化餐館</h1>
                 </div>
             </div>
             
             <div class="space-y-4 text-sm">
                 <div id="store-announcement" class="bg-amber-50 text-amber-800 p-3 rounded-xl border border-amber-100">
-                    載入公告中...
+                    💰 本店提供消費滿 $500 免運費服務！
                 </div>
                 <div class="border-b pb-3">
                     <h3 class="font-bold text-base mb-1">營業時間</h3>
@@ -139,14 +138,13 @@
     </div>
 
     <script>
-        // 自動連結您提供的試算表後台 ID
         const SPREADSHEET_ID = '1bsf6I3TJJRMZi3w4nS7yoz6Yn7Tt43hGHpZLg5stk-w';
-
         let products = {};
         let cart = {}; 
         let currentModalProductId = null;
         let currentModalQty = 1;
 
+        // 優化版：自動處理 Google Sheets 欄位大小寫與空格
         async function fetchSheetData(sheetName) {
             const url = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
             const response = await fetch(url);
@@ -154,12 +152,15 @@
             const json = JSON.parse(text.substr(47).slice(0, -2));
             
             const rows = json.table.rows;
-            const cols = json.table.cols.map(c => c.label || (c.id ? c.id.toLowerCase() : ''));
+            // 將所有欄位名稱轉為純小寫、去空格
+            const cols = json.table.cols.map(c => (c.label || c.id || '').toLowerCase().trim());
             
             return rows.map(row => {
                 let obj = {};
                 row.c.forEach((cell, i) => {
-                    if(cols[i]) obj[cols[i]] = cell ? cell.v : '';
+                    if(cols[i]) {
+                        obj[cols[i]] = cell ? cell.v : '';
+                    }
                 });
                 return obj;
             });
@@ -167,39 +168,47 @@
 
         async function initSystem() {
             try {
-                // 1. 讀取 Banner 頁籤
+                // 1. 讀取 Banner 資訊
                 try {
                     const bannerData = await fetchSheetData('Banner');
-                    if(bannerData && bannerData[0]) {
-                        document.getElementById('store-name').innerText = bannerData[0].title || '我的客製化餐館';
-                        document.getElementById('store-announcement').innerText = `💰 ${bannerData[0].subtitle || '歡迎光臨'}`;
-                        document.getElementById('store-banner-img').src = bannerData[0].imageUrl || 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600';
+                    if(bannerData && bannerData.length > 0) {
+                        // 自動尋找相近的欄位名稱
+                        const row = bannerData[0];
+                        const title = row.title || row.storename || row.店家名稱 || '';
+                        const subtitle = row.subtitle || row.announcement || row.公告 || '';
+                        const imageUrl = row.imageurl || row.image || row.banner圖片 || '';
+
+                        if(title) document.getElementById('store-name').innerText = title;
+                        if(subtitle) document.getElementById('store-announcement').innerText = `💰 ${subtitle}`;
+                        if(imageUrl) document.getElementById('store-banner-img').src = imageUrl;
                     }
-                } catch(e) {
-                    // 如果 Banner 讀取失敗，使用預設值
-                    document.getElementById('store-name').innerText = '我的客製化餐館';
-                    document.getElementById('store-announcement').innerText = '💰 本店提供消費滿 $500 免運費服務！';
-                    document.getElementById('store-banner-img').src = 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=600';
-                }
+                } catch(e) { console.log("Banner 讀取使用預設值"); }
 
-                // 2. 讀取 Products 頁籤
+                // 2. 讀取 Products 商品列表
                 const productsData = await fetchSheetData('Products');
+                
                 productsData.forEach(p => {
-                    // 相容大寫或小寫欄位名稱
-                    const id = p.id;
-                    const category = p.category || 'cat-1';
-                    const name = p.name;
-                    const price = p.price;
-                    const description = p.description;
-                    const image = p.image;
-                    const status = p.status;
+                    // 相容各種可能的欄位名稱
+                    const id = p.id || p.商品id || p.編號;
+                    const category = p.category || p.分類 || 'cat-1';
+                    const name = p.name || p.title || p.商品名稱;
+                    const price = p.price || p.價格 || p.金額;
+                    const description = p.description || p.desc || p.商品簡介 || '';
+                    const image = p.image || p.imageurl || p.圖片網址 || '';
+                    const status = p.status || p.狀態 || '上架';
 
-                    if(status === '上架' && id) {
+                    // 只要狀態不是「下架」，且有名字跟 ID 就上架
+                    if(id && name && status.toString().trim() !== '下架') {
+                        let finalCat = 'cat-1';
+                        const catStr = category.toString().toLowerCase().trim();
+                        if(catStr.includes('2') || catStr.includes('小吃')) finalCat = 'cat-2';
+                        if(catStr.includes('3') || catStr.includes('飲品')) finalCat = 'cat-3';
+
                         products[id] = {
                             id: id,
-                            category: category.trim(),
+                            category: finalCat,
                             name: name,
-                            price: Number(price),
+                            price: Number(price) || 0,
                             description: description,
                             image: image
                         };
@@ -210,7 +219,7 @@
                 document.getElementById('loading-screen').classList.add('hidden');
                 switchPage('menu');
             } catch (error) {
-                alert('讀取後台失敗！請確認您的 Google 試算表是否已點選「共用」並設定「知道連結的任何人」都可以檢視。');
+                alert('讀取後台失敗！請確認您的 Google 試算表右上角有按「共用」，並設定為「知道連結的任何人」都可以檢視唷！');
                 console.error(error);
             }
         }
@@ -230,7 +239,7 @@
                 hasProducts = true;
                 container.innerHTML += `
                     <div onclick="openModal('${p.id}')" class="bg-white rounded-xl p-3 flex shadow-xs border border-gray-100 cursor-pointer hover:border-gray-300 transition">
-                        <img src="${p.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'}" class="w-20 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100" />
+                        <img src="${p.image || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'}" class="w-20 h-20 object-cover rounded-lg flex-shrink-0 bg-gray-100" onError="this.src='https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300'" />
                         <div class="ml-3 flex flex-col justify-between flex-1">
                             <div>
                                 <h4 class="font-bold text-gray-900 text-base">${p.name}</h4>
@@ -248,7 +257,7 @@
             }
 
             if(!hasProducts) {
-                document.getElementById('products-cat-1').innerHTML = '<p class="text-center text-xs text-gray-400 py-4">暫無上架商品，請至後台新增</p>';
+                document.getElementById('products-cat-1').innerHTML = '<p class="text-center text-xs text-gray-400 py-6">後台暫無上架商品，或分類代號不正確。</p>';
             }
         }
 
