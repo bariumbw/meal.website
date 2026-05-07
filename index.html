@@ -33,21 +33,21 @@
         const SHEET_ID_1 = '1uYO5zkzNi_LrNncPETMAjaVOhtTEVgedSJTUmqA6R1E';
         const SHEET_ID_2 = '1TlmlJEQwCqZYJ6POd8tZia6ZVaIOPv5-QRCt86Z9Obc';
 
-        // 💡 終極方案：依據欄位順序 (0=A, 1=B, 2=C...) 進行絕對定位，完全避開中文字元編碼問題
-        const courseColumns = [
-            { index: 7, name: "【婚宴合約避雷速成班】（講者：前資深宴會經理 ｜ P 叔叔）" },
-            { index: 8, name: "【中式婚禮禮儀必修課】（講者：資深專業大妗｜羅勤芳）" },
-            { index: 9, name: "【Big Day 前修身攻略】（講者：星級健身導師 ｜李綺雯）" },
-            { index: 10, name: "【兄弟姊妹團工作分配 + MC 實戰術】（講者：婚禮細節之鬼 ｜MC Alan Li ）" },
-            { index: 11, name: "【Big Day 全流程速成班】（講者：專業Wedding planner｜Michelle Ng）" },
-            { index: 12, name: "【Pre-Wedding婚攝大師班】（講者：Jason Pang Gallery｜Jason Pang ）" },
-            { index: 13, name: "【韓風室內婚攝美學速成班】" },
-            { index: 14, name: "【台灣小清新婚攝夢幻攻略】" },
-            { index: 15, name: "【Big Day 攝影實戰指南】" },
-            { index: 16, name: "【新郎兄弟禮服搭配專修班】" },
-            { index: 17, name: "【新娘上鏡妝容示範班】現場Model示範" },
-            { index: 18, name: "【婚紗身型配對術】" },
-            { index: 19, name: "【海外Pre-Wedding 全方位研修班】" }
+        // 定義我們要尋找的目標課程名稱
+        const targetCourses = [
+            "【婚宴合約避雷速成班】",
+            "【中式婚禮禮儀必修課】",
+            "【Big Day 前修身攻略】",
+            "【兄弟姊妹團工作分配 + MC 實戰術】",
+            "【Big Day 全流程速成班】",
+            "【Pre-Wedding婚攝大師班】",
+            "【韓風室內婚攝美學速成班】",
+            "【台灣小清新婚攝夢幻攻略】",
+            "【Big Day 攝影實戰指南】",
+            "【新郎兄弟禮服搭配專修班】",
+            "【新娘上鏡妝容示範班】",
+            "【婚紗身型配對術】",
+            "【海外Pre-Wedding 全方位研修班】"
         ];
 
         async function searchRegistration() {
@@ -85,19 +85,10 @@
                     const card = document.createElement('div');
                     card.className = "border border-gray-200 rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition";
 
-                    // 檢查選修了哪些課程
-                    let selectedCourses = [];
-                    courseColumns.forEach(course => {
-                        const cellValue = record.rawCells[course.index];
-                        if (cellValue === true || cellValue === 'TRUE' || cellValue === 'true') {
-                            selectedCourses.push(course.name);
-                        }
-                    });
-
                     let courseListHTML = '';
-                    if (selectedCourses.length > 0) {
+                    if (record.courses && record.courses.length > 0) {
                         courseListHTML = `<ul class="list-disc pl-5 space-y-1 text-gray-700">`;
-                        selectedCourses.forEach(c => {
+                        record.courses.forEach(c => {
                             courseListHTML += `<li class="font-medium text-pink-700">${c}</li>`;
                         });
                         courseListHTML += `</ul>`;
@@ -134,14 +125,13 @@
         }
 
         async function fetchSheetData(sheetId, phoneNumber) {
-            // 💡 修正關鍵：改用最純粹的 SELECT *，完全不向 Google Sheets API 傳遞任何含有中文或特殊符號的標題名稱
-            const tqUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tq=` + encodeURIComponent(`SELECT * WHERE D = '${phoneNumber}'`);
+            // 💡 為了應對欄位位置變動，我們先把整張 Sheet 的前 100 筆（或全部）抓下來進行動態分析
+            const tqUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tq=` + encodeURIComponent(`SELECT *`);
             
             const response = await fetch(tqUrl);
             if (!response.ok) throw new Error('Network response was not ok');
             
             const text = await response.text();
-            
             const startIdx = text.indexOf("google.visualization.Query.setResponse(");
             if (startIdx === -1) return [];
             
@@ -152,21 +142,64 @@
                 return [];
             }
 
+            const headers = json.table.cols;
             const rows = json.table.rows;
 
-            return rows.map(row => {
-                // 將一列中所有儲存格的值提取為一個純陣列
-                let cells = row.c.map(cell => cell ? cell.v : null);
-                
-                return {
-                    time: cells[1],      // B欄：Submission time
-                    name: cells[2],      // C欄：中文姓名
-                    phone: cells[3],     // D欄：聯絡電話
-                    email: cells[4],     // E欄：Email
-                    type: cells[6],      // G欄：需要登記參加
-                    rawCells: cells      // 保留完整陣列供後續欄位 Index 比對
-                };
+            // 🔍 動態偵測各個關鍵欄位的索引位置位置
+            let phoneIdx = 3; // 預設 D 欄
+            let timeIdx = 1;  // 預設 B 欄
+            let nameIdx = 2;  // 預設 C 欄
+            let emailIdx = 4; // 預設 E 欄
+            let typeIdx = 6;  // 預設 G 欄
+            let courseMappings = []; // 存放找到的課程欄位索引與完整名稱
+
+            headers.forEach((col, idx) => {
+                const label = col.label || "";
+                if (label.includes("聯絡電話")) phoneIdx = idx;
+                if (label.includes("Submission time")) timeIdx = idx;
+                if (label.includes("中文姓名")) nameIdx = idx;
+                if (label.includes("Email")) emailIdx = idx;
+                if (label.includes("需要登記參加")) typeIdx = idx;
+
+                // 檢查是否符合我們的課程清單
+                targetCourses.forEach(courseTitle => {
+                    if (label.includes(courseTitle)) {
+                        courseMappings.push({ idx: idx, fullName: label });
+                    }
+                });
             });
+
+            // 過濾出電話號碼符合的使用者資料
+            let matchedRecords = [];
+            
+            rows.forEach(row => {
+                const cells = row.c.map(cell => cell ? cell.v : null);
+                
+                // 檢查這列的電話是否匹配 (轉成字串比對，防呆空格)
+                const currentPhone = cells[phoneIdx] ? cells[phoneIdx].toString().trim() : "";
+                if (currentPhone === phoneNumber.toString().trim()) {
+                    
+                    // 收集這名登記人勾選為 TRUE 的課程
+                    let userCourses = [];
+                    courseMappings.forEach(mapping => {
+                        const val = cells[mapping.idx];
+                        if (val === true || val === 'TRUE' || val === 'true') {
+                            userCourses.push(mapping.fullName);
+                        }
+                    });
+
+                    matchedRecords.push({
+                        time: cells[timeIdx],
+                        name: cells[nameIdx],
+                        phone: currentPhone,
+                        email: cells[emailIdx],
+                        type: cells[typeIdx],
+                        courses: userCourses
+                    });
+                }
+            });
+
+            return matchedRecords;
         }
     </script>
 </body>
